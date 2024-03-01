@@ -5,8 +5,7 @@
 
 using Scalar = libff::bigint<libff::alt_bn128_q_limbs>;
 
-// Must be called prior to invoking any other method.
-// May be called many times from multiple threads.
+// TODO: Initializing with a global initialization doesn't work.
 static void init_libff() noexcept {
   // magic static
   [[maybe_unused]] static bool initialized = []() noexcept {
@@ -20,7 +19,8 @@ static void init_libff() noexcept {
 static Scalar to_scalar(const uint8_t bytes_be[32]) noexcept {
   mpz_t m;
   mpz_init(m);
-  mpz_import(m, 32, /*order=*/1, /*size=*/1, /*endian=*/0, /*nails=*/0, bytes_be);
+  mpz_import(m, 32, /*order=*/1, /*size=*/1, /*endian=*/0, /*nails=*/0,
+             bytes_be);
   Scalar out{m};
   mpz_clear(m);
   return out;
@@ -28,8 +28,9 @@ static Scalar to_scalar(const uint8_t bytes_be[32]) noexcept {
 
 // Notation warning: Yellow Paper's p is the same libff's q.
 // Returns x < p (YP notation).
-static bool valid_element_of_fp(const Scalar& x) noexcept {
-  return mpn_cmp(x.data, libff::alt_bn128_modulus_q.data, libff::alt_bn128_q_limbs) < 0;
+static bool valid_element_of_fp(const Scalar &x) noexcept {
+  return mpn_cmp(x.data, libff::alt_bn128_modulus_q.data,
+                 libff::alt_bn128_q_limbs) < 0;
 }
 
 static std::optional<libff::alt_bn128_G1>
@@ -99,25 +100,23 @@ decode_g2_element(const uint8_t bytes_be[128]) noexcept {
 
 Result libff_pairing_verify(bytes_view input) noexcept {
   if (input.size() % INPUT_STRIDE != 0) {
-    return Result::invalid_input;
+    return Result::invalid_input_length;
   }
   const size_t k = input.size() / INPUT_STRIDE;
 
   init_libff();
-  using namespace libff;
 
-  static const auto one{alt_bn128_Fq12::one()};
-  auto accumulator{one};
+  static const auto ONE{libff::alt_bn128_Fq12::one()};
+  auto accumulator = ONE;
 
   for (size_t i{0}; i < k; ++i) {
-    std::optional<alt_bn128_G1> a{decode_g1_element(&input[i * INPUT_STRIDE])};
+    auto a{decode_g1_element(&input[i * INPUT_STRIDE])};
     if (!a) {
-      return Result::invalid_input;
+      return Result::invalid_g1;
     }
-    std::optional<alt_bn128_G2> b{
-        decode_g2_element(&input[i * INPUT_STRIDE + 64])};
+    auto b{decode_g2_element(&input[i * INPUT_STRIDE + 64])};
     if (!b) {
-      return Result::invalid_input;
+      return Result::invalid_g2;
     }
 
     if (a->is_zero() || b->is_zero()) {
@@ -129,7 +128,7 @@ Result libff_pairing_verify(bytes_view input) noexcept {
                                             alt_bn128_precompute_G2(*b));
   }
 
-  if (alt_bn128_final_exponentiation(accumulator) == one) {
+  if (alt_bn128_final_exponentiation(accumulator) == ONE) {
     return Result::one;
   }
   return Result::zero;
