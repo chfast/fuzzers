@@ -10,6 +10,7 @@ extern "C" size_t LLVMFuzzerMutate(uint8_t *data, size_t size, size_t max_size);
 
 namespace {
 
+// https://en.wikipedia.org/wiki/Linear_congruential_generator
 inline unsigned next_seed(unsigned seed) noexcept { return 0x10DCD * seed + 1; }
 
 void mutate_builtin_b32(uint8_t *data) {
@@ -21,10 +22,11 @@ using Mutator = long (*)(uint8_t *, size_t, size_t, unsigned int);
 
 /// Mutates a single field element in the first stride using builtin mutator.
 long mutate_fe(uint8_t *data, size_t size, size_t max_size, unsigned int seed) {
-  assert(size >= INPUT_STRIDE);
+  assert(max_size >= INPUT_STRIDE);
+  // assert(size >= INPUT_STRIDE);
   const auto fe_index = seed % FE_SIZE;
   mutate_builtin_b32(&data[fe_index * FE_SIZE]);
-  return size;
+  return std::max(size, max_size);
 }
 
 long swap_stride(uint8_t *data, size_t size, size_t max_size,
@@ -45,13 +47,25 @@ long swap_stride(uint8_t *data, size_t size, size_t max_size,
   return size;
 }
 
-constexpr Mutator mutators[] = {mutate_fe, swap_stride};
+long rm_stride(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
+  if (size < 2 * INPUT_STRIDE)
+    return -1;
+
+  const auto num_strides = size / INPUT_STRIDE;
+  const auto i = seed % num_strides;
+  std::memmove(&data[i * INPUT_STRIDE], &data[(i + 1) * INPUT_STRIDE],
+               (num_strides - 1 - i) * INPUT_STRIDE);
+
+  return size - INPUT_STRIDE;
+}
+
+constexpr Mutator mutators[] = {mutate_fe, swap_stride, rm_stride};
 } // namespace
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t *data, size_t size,
                                           size_t max_size, unsigned int seed) {
-
-  assert(size != 0);
+  assert(max_size >= INPUT_STRIDE);
+  size = std::max(size, INPUT_STRIDE);
 
   while (true) {
     const auto i = seed % std::size(mutators);
