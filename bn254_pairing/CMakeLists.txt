@@ -1,5 +1,10 @@
 
-add_compile_options(-fsanitize=fuzzer,undefined)
+if(CMAKE_BUILD_TYPE STREQUAL Coverage)
+    add_compile_options(-g -fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-g -fprofile-instr-generate -fcoverage-mapping)
+else()
+    add_compile_options(-fsanitize=fuzzer,undefined)
+endif()
 
 block()
     set(CURVE "ALT_BN128" CACHE STRING "Default curve")
