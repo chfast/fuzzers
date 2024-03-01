@@ -70,11 +70,20 @@ long dup_stride(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
   return size + STRIDE_SIZE;
 }
 
+long zero_g1(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
+  assert(size >= STRIDE_SIZE);
+  std::memset(&data[0], 0, 2 * FE_SIZE);
+  return size;
+}
+
+long zero_g2(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
+  assert(size >= STRIDE_SIZE);
+  std::memset(&data[2 * FE_SIZE], 0, 4 * FE_SIZE);
+  return size;
+}
+
 constexpr Mutator mutators[] = {
-    mutate_fe,
-    swap_stride,
-    rm_stride,
-    dup_stride,
+    mutate_fe, swap_stride, rm_stride, dup_stride, zero_g1, zero_g2,
 };
 } // namespace
 
