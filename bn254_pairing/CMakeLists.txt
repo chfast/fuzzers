@@ -9,12 +9,14 @@ block()
 endblock()
 
 add_executable(bn254-pairing-fuzz)
+target_compile_features(bn254-pairing-fuzz PRIVATE cxx_std_23)
 target_link_options(bn254-pairing-fuzz PRIVATE -fsanitize=fuzzer)
 target_link_libraries(bn254-pairing-fuzz PRIVATE libff::ff)
 target_sources(
     bn254-pairing-fuzz
     PRIVATE
     fuzz.cpp
+    mutator.cpp
     impl.hpp
     impl_libff.cpp
 )
