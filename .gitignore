@@ -3,4 +3,5 @@
 /corpus
 /venv
 
+crash-*
 oom-*
