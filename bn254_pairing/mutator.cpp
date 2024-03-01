@@ -23,8 +23,8 @@ using Mutator = long (*)(uint8_t *, size_t, size_t, unsigned int);
 /// Mutates a single field element in the first stride using builtin mutator.
 long mutate_fe(uint8_t *data, size_t size, size_t max_size, unsigned int seed) {
   assert(max_size >= STRIDE_SIZE);
-  // assert(size >= INPUT_STRIDE);
-  const auto fe_index = seed % FE_SIZE;
+  assert(size >= STRIDE_SIZE);
+  const auto fe_index = seed % (STRIDE_SIZE / FE_SIZE);
   mutate_builtin_b32(&data[fe_index * FE_SIZE]);
   return std::max(size, max_size);
 }
