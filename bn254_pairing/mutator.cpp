@@ -59,7 +59,23 @@ long rm_stride(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
   return size - STRIDE_SIZE;
 }
 
-constexpr Mutator mutators[] = {mutate_fe, swap_stride, rm_stride};
+long dup_stride(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
+  if (size + STRIDE_SIZE > max_size)
+    return -1;
+
+  const auto num_strides = size / STRIDE_SIZE;
+  const auto i = seed % num_strides;
+  std::memmove(&data[size], &data[i * STRIDE_SIZE], STRIDE_SIZE);
+
+  return size + STRIDE_SIZE;
+}
+
+constexpr Mutator mutators[] = {
+    mutate_fe,
+    swap_stride,
+    rm_stride,
+    dup_stride,
+};
 } // namespace
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t *data, size_t size,
