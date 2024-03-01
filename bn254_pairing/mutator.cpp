@@ -22,7 +22,7 @@ using Mutator = long (*)(uint8_t *, size_t, size_t, unsigned int);
 
 /// Mutates a single field element in the first stride using builtin mutator.
 long mutate_fe(uint8_t *data, size_t size, size_t max_size, unsigned int seed) {
-  assert(max_size >= INPUT_STRIDE);
+  assert(max_size >= STRIDE_SIZE);
   // assert(size >= INPUT_STRIDE);
   const auto fe_index = seed % FE_SIZE;
   mutate_builtin_b32(&data[fe_index * FE_SIZE]);
@@ -31,32 +31,32 @@ long mutate_fe(uint8_t *data, size_t size, size_t max_size, unsigned int seed) {
 
 long swap_stride(uint8_t *data, size_t size, size_t max_size,
                  unsigned int seed) {
-  if (size < 2 * INPUT_STRIDE)
+  if (size < 2 * STRIDE_SIZE)
     return -1;
 
   const auto seed_h = seed >> 16;
   const auto seed_l = static_cast<uint16_t>(seed);
-  const auto num_strides = size / INPUT_STRIDE;
+  const auto num_strides = size / STRIDE_SIZE;
   const auto i = seed_l % num_strides;
   const auto j = seed_h % num_strides;
 
-  uint8_t tmp[INPUT_STRIDE];
-  std::memcpy(tmp, &data[i * INPUT_STRIDE], INPUT_STRIDE);
-  std::memcpy(&data[i * INPUT_STRIDE], &data[j * INPUT_STRIDE], INPUT_STRIDE);
-  std::memcpy(&data[j * INPUT_STRIDE], tmp, INPUT_STRIDE);
+  uint8_t tmp[STRIDE_SIZE];
+  std::memcpy(tmp, &data[i * STRIDE_SIZE], STRIDE_SIZE);
+  std::memcpy(&data[i * STRIDE_SIZE], &data[j * STRIDE_SIZE], STRIDE_SIZE);
+  std::memcpy(&data[j * STRIDE_SIZE], tmp, STRIDE_SIZE);
   return size;
 }
 
 long rm_stride(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
-  if (size < 2 * INPUT_STRIDE)
+  if (size < 2 * STRIDE_SIZE)
     return -1;
 
-  const auto num_strides = size / INPUT_STRIDE;
+  const auto num_strides = size / STRIDE_SIZE;
   const auto i = seed % num_strides;
-  std::memmove(&data[i * INPUT_STRIDE], &data[(i + 1) * INPUT_STRIDE],
-               (num_strides - 1 - i) * INPUT_STRIDE);
+  std::memmove(&data[i * STRIDE_SIZE], &data[(i + 1) * STRIDE_SIZE],
+               (num_strides - 1 - i) * STRIDE_SIZE);
 
-  return size - INPUT_STRIDE;
+  return size - STRIDE_SIZE;
 }
 
 constexpr Mutator mutators[] = {mutate_fe, swap_stride, rm_stride};
@@ -64,8 +64,8 @@ constexpr Mutator mutators[] = {mutate_fe, swap_stride, rm_stride};
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t *data, size_t size,
                                           size_t max_size, unsigned int seed) {
-  assert(max_size >= INPUT_STRIDE);
-  size = std::max(size, INPUT_STRIDE);
+  assert(max_size >= STRIDE_SIZE);
+  size = std::max(size, STRIDE_SIZE);
 
   while (true) {
     const auto i = seed % std::size(mutators);

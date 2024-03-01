@@ -99,10 +99,10 @@ decode_g2_element(const uint8_t bytes_be[128]) noexcept {
 }
 
 Result libff_pairing_verify(bytes_view input) noexcept {
-  if (input.size() % INPUT_STRIDE != 0) {
+  if (input.size() % STRIDE_SIZE != 0) {
     return Result::invalid_input_length;
   }
-  const size_t k = input.size() / INPUT_STRIDE;
+  const size_t k = input.size() / STRIDE_SIZE;
 
   init_libff();
 
@@ -110,11 +110,11 @@ Result libff_pairing_verify(bytes_view input) noexcept {
   auto accumulator = ONE;
 
   for (size_t i{0}; i < k; ++i) {
-    auto a{decode_g1_element(&input[i * INPUT_STRIDE])};
+    auto a{decode_g1_element(&input[i * STRIDE_SIZE])};
     if (!a) {
       return Result::invalid_g1;
     }
-    auto b{decode_g2_element(&input[i * INPUT_STRIDE + 64])};
+    auto b{decode_g2_element(&input[i * STRIDE_SIZE + 64])};
     if (!b) {
       return Result::invalid_g2;
     }

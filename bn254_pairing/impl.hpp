@@ -15,7 +15,7 @@ enum class Result {
   MAX,
 };
 
-inline constexpr size_t INPUT_STRIDE = 192;
+inline constexpr size_t STRIDE_SIZE = 192;
 inline constexpr size_t FE_SIZE = 32;
 
 Result libff_pairing_verify(bytes_view input) noexcept;
