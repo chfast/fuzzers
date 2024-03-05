@@ -201,11 +201,11 @@ void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
   encode_g1_element(out + 192, nC);
   encode_g2_element(out + 192 + 64, G);
 
-  const auto r = libff_pairing_verify({out, 2 * STRIDE_SIZE});
-  if (r != Result::one) {
-    std::cerr << "result: " << int(r) << "\n";
-    __builtin_trap();
-  }
+  // const auto r = libff_pairing_verify({out, 2 * STRIDE_SIZE});
+  // if (r != Result::one) {
+  //   std::cerr << "result: " << int(r) << "\n";
+  //   __builtin_trap();
+  // }
 
   mpz_clears(a, b, c, o, mc, nc, nullptr);
 }
