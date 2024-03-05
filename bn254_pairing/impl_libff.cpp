@@ -209,3 +209,23 @@ void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
 
   mpz_clears(a, b, c, o, mc, nc, nullptr);
 }
+
+bool libff_generate_wrong_g2(uint8_t data[4 * FE_SIZE]) {
+  mpz_t x0, x1;
+  mpz_inits(x0, x1, nullptr);
+  mpz_import(x0, 32, 1, 1, 0, 0, &data[0]);
+  mpz_import(x1, 32, 1, 1, 0, 0, &data[32]);
+
+  const auto x = libff::alt_bn128_Fq2{{x0}, {x1}};
+  mpz_clears(x0, x1, nullptr);
+  const auto y2 = x.squared() * x + libff::alt_bn128_twist_coeff_b;
+  const auto y = y2.sqrt();
+  libff::alt_bn128_G2 p{x, y, libff::alt_bn128_Fq2::one()};
+  if (!p.is_well_formed())
+    return false;
+
+  // unlikely the generated point will be from G2 subgroup, but it happens.
+  // assert(!(libff::alt_bn128_G2::order() * p).is_zero());
+  encode_g2_element(data, p);
+  return true;
+}

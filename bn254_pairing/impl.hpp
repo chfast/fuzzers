@@ -22,3 +22,5 @@ Result libff_pairing_verify(bytes_view input) noexcept;
 
 void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
                         const uint8_t scalars_data[2 * FE_SIZE]);
+
+bool libff_generate_wrong_g2(uint8_t data[4 * FE_SIZE]);

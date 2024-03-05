@@ -92,8 +92,21 @@ long generate_abc(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
   return std::max(size, 2 * STRIDE_SIZE);
 }
 
-constexpr Mutator mutators[] = {mutate_fe, swap_stride, rm_stride,   dup_stride,
-                                zero_g1,   zero_g2,     generate_abc};
+long generate_wrong_g2(uint8_t *data, size_t size, size_t max_size,
+                       unsigned seed) {
+  if (size < STRIDE_SIZE)
+    return -1;
+
+  const auto g2_data = &data[2 * FE_SIZE];
+  do {
+    LLVMFuzzerMutate(g2_data, 4 * FE_SIZE, 4 * FE_SIZE);
+  } while (!libff_generate_wrong_g2(g2_data));
+  return size;
+}
+
+constexpr Mutator mutators[] = {mutate_fe,    swap_stride,      rm_stride,
+                                dup_stride,   zero_g1,          zero_g2,
+                                generate_abc, generate_wrong_g2};
 } // namespace
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t *data, size_t size,
