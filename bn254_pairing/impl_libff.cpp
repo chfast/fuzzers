@@ -91,11 +91,6 @@ decode_g2_element(const uint8_t bytes_be[128]) noexcept {
     return {};
   }
 
-  if (!(libff::alt_bn128_G2::order() * point).is_zero()) {
-    // wrong order, doesn't belong to the subgroup G2
-    return {};
-  }
-
   return point;
 }
 
@@ -109,6 +104,8 @@ Result libff_pairing_verify(bytes_view input) noexcept {
 
   static const auto ONE{libff::alt_bn128_Fq12::one()};
   auto accumulator = ONE;
+
+  bool b_in_g2 = true;
 
   for (size_t i{0}; i < k; ++i) {
     auto a{decode_g1_element(&input[i * STRIDE_SIZE])};
@@ -124,12 +121,18 @@ Result libff_pairing_verify(bytes_view input) noexcept {
       continue;
     }
 
+    if (!(libff::alt_bn128_G2::order() * *b).is_zero()) {
+      // wrong order, doesn't belong to the subgroup G2
+      b_in_g2 = false;
+    }
+
     accumulator =
         accumulator * alt_bn128_miller_loop(alt_bn128_precompute_G1(*a),
                                             alt_bn128_precompute_G2(*b));
   }
 
   if (alt_bn128_final_exponentiation(accumulator) == ONE) {
+    assert(b_in_g2);
     return Result::one;
   }
   return Result::zero;
