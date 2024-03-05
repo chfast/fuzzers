@@ -1,4 +1,5 @@
 #include "impl.hpp"
+#include <algorithm>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pairing.hpp>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
 #include <optional>
@@ -132,4 +133,79 @@ Result libff_pairing_verify(bytes_view input) noexcept {
     return Result::one;
   }
   return Result::zero;
+}
+
+static void encode_fe(uint8_t out[32], const libff::alt_bn128_Fq &f) noexcept {
+  auto x = f.as_bigint();
+  std::memcpy(&out[0], x.data, 32);
+  std::reverse(out, out + 32);
+}
+
+static void encode_g1_element(uint8_t out[64], libff::alt_bn128_G1 p) noexcept {
+  std::memset(out, 0, 64);
+  if (p.is_zero()) {
+    return;
+  }
+
+  p.to_affine_coordinates();
+  encode_fe(out, p.X);
+  encode_fe(out + 32, p.Y);
+}
+
+static void encode_g2_element(uint8_t out[128],
+                              libff::alt_bn128_G2 p) noexcept {
+  std::memset(out, 0, 128);
+  if (p.is_zero()) {
+    return;
+  }
+
+  p.to_affine_coordinates();
+  encode_fe(out, p.X.c1);
+  encode_fe(out + 32, p.X.c0);
+  encode_fe(out + 64, p.Y.c1);
+  encode_fe(out + 96, p.Y.c0);
+}
+
+void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
+                        const uint8_t scalars_data[2 * FE_SIZE]) {
+  mpz_t a;
+  mpz_init(a);
+  mpz_import(a, 32, 1, 1, 0, 0, scalars_data);
+
+  mpz_t b;
+  mpz_init(b);
+  mpz_import(b, 32, 1, 1, 0, 0, scalars_data + FE_SIZE);
+
+  mpz_t c;
+  mpz_init(c);
+  mpz_mul(c, a, b);
+
+  mpz_t o;
+  mpz_init(o);
+  libff::alt_bn128_G1::order().to_mpz(o);
+
+  mpz_t mc;
+  mpz_init(mc);
+  mpz_mod(mc, c, o);
+  mpz_t nc;
+  mpz_init(nc);
+  mpz_sub(nc, o, mc);
+
+  const auto A = Scalar{a} * libff::alt_bn128_G1::G1_one;
+  const auto B = Scalar{b} * libff::alt_bn128_G2::G2_one;
+  const auto nC = Scalar{nc} * libff::alt_bn128_G1::G1_one;
+  const auto G = libff::alt_bn128_G2::G2_one;
+
+  encode_g1_element(out, A);
+  encode_g2_element(out + 64, B);
+  encode_g1_element(out + 192, nC);
+  encode_g2_element(out + 192 + 64, G);
+
+  const auto r = libff_pairing_verify({out, 2 * STRIDE_SIZE});
+  if (r != Result::one) {
+    std::cerr << "result: " << int(r) << "\n";
+    __builtin_trap();
+  }
+
+  mpz_clears(a, b, c, o, mc, nc, nullptr);
 }
