@@ -86,9 +86,9 @@ long generate_abc(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
   if (max_size < 2 * STRIDE_SIZE)
     return -1;
 
-  // we need two random scalars a and b, use the tailing data for this.
-  LLVMFuzzerMutate(&data[max_size - 2 * FE_SIZE], 2 * FE_SIZE, 2 * FE_SIZE);
-  libff_generate_abc(data, &data[max_size - 2 * FE_SIZE]);
+  // we need two random scalars a and b, use existing data for this.
+  LLVMFuzzerMutate(data, 2 * FE_SIZE, 2 * FE_SIZE);
+  libff_generate_abc(data);
   return std::max(size, 2 * STRIDE_SIZE);
 }
 
@@ -96,11 +96,10 @@ long generate_abcd(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
   if (max_size < 2 * STRIDE_SIZE)
     return -1;
 
-  const auto scalar_data = &data[max_size - 3 * FE_SIZE];
   do {
-    // we need 3 random scalars, use the tailing data for this.
-    LLVMFuzzerMutate(scalar_data, 3 * FE_SIZE, 3 * FE_SIZE);
-  } while (!libff_generate_abcd(data, scalar_data));
+    // we need 3 random scalars, use the existing data for this.
+    LLVMFuzzerMutate(data, 3 * FE_SIZE, 3 * FE_SIZE);
+  } while (!libff_generate_abcd(data));
   return std::max(size, 2 * STRIDE_SIZE);
 }
 

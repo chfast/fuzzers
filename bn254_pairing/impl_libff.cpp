@@ -170,13 +170,12 @@ static void encode_g2_element(uint8_t out[128],
   encode_fe(out + 96, p.Y.c0);
 }
 
-void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
-                        const uint8_t scalars_data[2 * FE_SIZE]) {
+void libff_generate_abc(uint8_t data[2 * STRIDE_SIZE]) {
 
   mpz_t x0, x1;
   mpz_inits(x0, x1, nullptr);
-  mpz_import(x0, 32, 1, 1, 0, 0, scalars_data);
-  mpz_import(x1, 32, 1, 1, 0, 0, scalars_data + FE_SIZE);
+  mpz_import(x0, 32, 1, 1, 0, 0, data);
+  mpz_import(x1, 32, 1, 1, 0, 0, data + FE_SIZE);
   const auto a = libff::alt_bn128_Fr{x0};
   const auto b = libff::alt_bn128_Fr{x1};
   mpz_clears(x0, x1, nullptr);
@@ -187,10 +186,10 @@ void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
   const auto nC = -c * libff::alt_bn128_G1::G1_one;
   const auto G = libff::alt_bn128_G2::G2_one;
 
-  encode_g1_element(out, A);
-  encode_g2_element(out + 64, B);
-  encode_g1_element(out + 192, nC);
-  encode_g2_element(out + 192 + 64, G);
+  encode_g1_element(data, A);
+  encode_g2_element(data + 64, B);
+  encode_g1_element(data + 192, nC);
+  encode_g2_element(data + 192 + 64, G);
 
   // const auto r = libff_pairing_verify({out, 2 * STRIDE_SIZE});
   // if (r != Result::one) {
@@ -199,14 +198,13 @@ void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
   // }
 }
 
-bool libff_generate_abcd(uint8_t out[2 * STRIDE_SIZE],
-                         const uint8_t scalars_data[3 * FE_SIZE]) {
+bool libff_generate_abcd(uint8_t data[2 * STRIDE_SIZE]) {
 
   mpz_t x0, x1, x2;
   mpz_inits(x0, x1, x2, nullptr);
-  mpz_import(x0, 32, 1, 1, 0, 0, scalars_data);
-  mpz_import(x1, 32, 1, 1, 0, 0, scalars_data + FE_SIZE);
-  mpz_import(x2, 32, 1, 1, 0, 0, scalars_data + 2 * FE_SIZE);
+  mpz_import(x0, 32, 1, 1, 0, 0, data);
+  mpz_import(x1, 32, 1, 1, 0, 0, data + FE_SIZE);
+  mpz_import(x2, 32, 1, 1, 0, 0, data + 2 * FE_SIZE);
   const auto a = libff::alt_bn128_Fr{x0};
   const auto b = libff::alt_bn128_Fr{x1};
   const auto c = libff::alt_bn128_Fr{x2};
@@ -223,10 +221,10 @@ bool libff_generate_abcd(uint8_t out[2 * STRIDE_SIZE],
   const auto nC = -c * libff::alt_bn128_G1::G1_one;
   const auto D = d * libff::alt_bn128_G2::G2_one;
 
-  encode_g1_element(out, A);
-  encode_g2_element(out + 64, B);
-  encode_g1_element(out + 192, nC);
-  encode_g2_element(out + 192 + 64, D);
+  encode_g1_element(data, A);
+  encode_g2_element(data + 64, B);
+  encode_g1_element(data + 192, nC);
+  encode_g2_element(data + 192 + 64, D);
 
   // const auto r = libff_pairing_verify({out, 2 * STRIDE_SIZE});
   // if (r != Result::one) {
