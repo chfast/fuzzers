@@ -70,6 +70,14 @@ long dup_stride(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
   return size + STRIDE_SIZE;
 }
 
+long rm_half_strides(uint8_t *data, size_t size, size_t max_size,
+                     unsigned seed) {
+  if (size >= 4 * STRIDE_SIZE && size % 2 * STRIDE_SIZE == 0)
+    return -1;
+
+  return size / 2;
+}
+
 long zero_g1(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
   assert(size >= STRIDE_SIZE);
   std::memset(&data[0], 0, 2 * FE_SIZE);
@@ -126,11 +134,19 @@ long generate_wrong_g2_pair(uint8_t *data, size_t size, size_t max_size,
   return size;
 }
 
-constexpr Mutator mutators[] = {mutate_fe,         swap_stride,
-                                rm_stride,         dup_stride,
-                                zero_g1,           zero_g2,
-                                generate_abc,      generate_abcd,
-                                generate_wrong_g2, generate_wrong_g2_pair};
+constexpr Mutator mutators[] = {
+    mutate_fe,
+    swap_stride,
+    rm_stride,
+    dup_stride,
+    rm_half_strides,
+    zero_g1,
+    zero_g2,
+    generate_abc,
+    generate_abcd,
+    generate_wrong_g2,
+    generate_wrong_g2_pair,
+};
 } // namespace
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t *data, size_t size,
