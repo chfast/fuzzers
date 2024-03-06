@@ -198,6 +198,43 @@ void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
   // }
 }
 
+bool libff_generate_abcd(uint8_t out[2 * STRIDE_SIZE],
+                         const uint8_t scalars_data[3 * FE_SIZE]) {
+
+  mpz_t x0, x1, x2;
+  mpz_inits(x0, x1, x2, nullptr);
+  mpz_import(x0, 32, 1, 1, 0, 0, scalars_data);
+  mpz_import(x1, 32, 1, 1, 0, 0, scalars_data + FE_SIZE);
+  mpz_import(x2, 32, 1, 1, 0, 0, scalars_data + 2 * FE_SIZE);
+  const auto a = libff::alt_bn128_Fr{x0};
+  const auto b = libff::alt_bn128_Fr{x1};
+  const auto c = libff::alt_bn128_Fr{x2};
+  mpz_clears(x0, x1, x2, nullptr);
+
+  if (c.is_zero())
+    return false;
+
+  const auto d = a * b * c.inverse();
+  assert(a * b == c * d);
+
+  const auto A = a * libff::alt_bn128_G1::G1_one;
+  const auto B = b * libff::alt_bn128_G2::G2_one;
+  const auto nC = -c * libff::alt_bn128_G1::G1_one;
+  const auto D = d * libff::alt_bn128_G2::G2_one;
+
+  encode_g1_element(out, A);
+  encode_g2_element(out + 64, B);
+  encode_g1_element(out + 192, nC);
+  encode_g2_element(out + 192 + 64, D);
+
+  const auto r = libff_pairing_verify({out, 2 * STRIDE_SIZE});
+  if (r != Result::one) {
+    std::cerr << "result: " << int(r) << "\n";
+    __builtin_trap();
+  }
+  return true;
+}
+
 bool libff_generate_wrong_g2(uint8_t data[4 * FE_SIZE]) {
   mpz_t x0, x1;
   mpz_inits(x0, x1, nullptr);

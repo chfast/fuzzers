@@ -92,6 +92,18 @@ long generate_abc(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
   return std::max(size, 2 * STRIDE_SIZE);
 }
 
+long generate_abcd(uint8_t *data, size_t size, size_t max_size, unsigned seed) {
+  if (max_size < 2 * STRIDE_SIZE)
+    return -1;
+
+  const auto scalar_data = &data[max_size - 3 * FE_SIZE];
+  do {
+    // we need 3 random scalars, use the tailing data for this.
+    LLVMFuzzerMutate(scalar_data, 3 * FE_SIZE, 3 * FE_SIZE);
+  } while (!libff_generate_abcd(data, scalar_data));
+  return std::max(size, 2 * STRIDE_SIZE);
+}
+
 long generate_wrong_g2(uint8_t *data, size_t size, size_t max_size,
                        unsigned seed) {
   if (size < STRIDE_SIZE)
@@ -104,9 +116,9 @@ long generate_wrong_g2(uint8_t *data, size_t size, size_t max_size,
   return size;
 }
 
-constexpr Mutator mutators[] = {mutate_fe,    swap_stride,      rm_stride,
-                                dup_stride,   zero_g1,          zero_g2,
-                                generate_abc, generate_wrong_g2};
+constexpr Mutator mutators[] = {mutate_fe,    swap_stride,   rm_stride,
+                                dup_stride,   zero_g1,       zero_g2,
+                                generate_abc, generate_abcd, generate_wrong_g2};
 } // namespace
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t *data, size_t size,
