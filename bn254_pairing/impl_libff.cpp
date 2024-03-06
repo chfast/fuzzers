@@ -136,6 +136,8 @@ Result libff_pairing_verify(bytes_view input) noexcept {
       return Result::invalid_g2_subgroup;
     return Result::one;
   }
+  if (!b_in_g2)
+    return Result::invalid_g2_subgroup;
   return Result::zero;
 }
 
