@@ -116,9 +116,22 @@ long generate_wrong_g2(uint8_t *data, size_t size, size_t max_size,
   return size;
 }
 
-constexpr Mutator mutators[] = {mutate_fe,    swap_stride,   rm_stride,
-                                dup_stride,   zero_g1,       zero_g2,
-                                generate_abc, generate_abcd, generate_wrong_g2};
+long generate_wrong_g2_pair(uint8_t *data, size_t size, size_t max_size,
+                            unsigned seed) {
+  if (size < 2 * STRIDE_SIZE)
+    return -1;
+
+  do {
+    LLVMFuzzerMutate(data, STRIDE_SIZE, STRIDE_SIZE);
+  } while (!libff_generate_wrong_g2_pair(data));
+  return size;
+}
+
+constexpr Mutator mutators[] = {mutate_fe,         swap_stride,
+                                rm_stride,         dup_stride,
+                                zero_g1,           zero_g2,
+                                generate_abc,      generate_abcd,
+                                generate_wrong_g2, generate_wrong_g2_pair};
 } // namespace
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t *data, size_t size,

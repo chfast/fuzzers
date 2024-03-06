@@ -11,6 +11,7 @@ enum class Result {
   invalid_input_length,
   invalid_g1,
   invalid_g2,
+  invalid_g2_subgroup,
 
   MAX,
 };
@@ -27,3 +28,4 @@ bool libff_generate_abcd(uint8_t out[2 * STRIDE_SIZE],
                          const uint8_t scalars_data[3 * FE_SIZE]);
 
 bool libff_generate_wrong_g2(uint8_t data[4 * FE_SIZE]);
+bool libff_generate_wrong_g2_pair(uint8_t data[2 * STRIDE_SIZE]);

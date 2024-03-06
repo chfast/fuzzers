@@ -132,7 +132,8 @@ Result libff_pairing_verify(bytes_view input) noexcept {
   }
 
   if (alt_bn128_final_exponentiation(accumulator) == ONE) {
-    assert(b_in_g2);
+    if (!b_in_g2)
+      return Result::invalid_g2_subgroup;
     return Result::one;
   }
   return Result::zero;
@@ -227,11 +228,11 @@ bool libff_generate_abcd(uint8_t out[2 * STRIDE_SIZE],
   encode_g1_element(out + 192, nC);
   encode_g2_element(out + 192 + 64, D);
 
-  const auto r = libff_pairing_verify({out, 2 * STRIDE_SIZE});
-  if (r != Result::one) {
-    std::cerr << "result: " << int(r) << "\n";
-    __builtin_trap();
-  }
+  // const auto r = libff_pairing_verify({out, 2 * STRIDE_SIZE});
+  // if (r != Result::one) {
+  //   std::cerr << "result: " << int(r) << "\n";
+  //   __builtin_trap();
+  // }
   return true;
 }
 
@@ -252,5 +253,42 @@ bool libff_generate_wrong_g2(uint8_t data[4 * FE_SIZE]) {
   // unlikely the generated point will be from G2 subgroup, but it happens.
   // assert(!(libff::alt_bn128_G2::order() * p).is_zero());
   encode_g2_element(data, p);
+  return true;
+}
+
+bool libff_generate_wrong_g2_pair(uint8_t data[2 * STRIDE_SIZE]) {
+  mpz_t x0, x1, x2;
+  mpz_inits(x0, x1, x2, nullptr);
+  mpz_import(x0, 32, 1, 1, 0, 0, &data[0]);
+  mpz_import(x1, 32, 1, 1, 0, 0, &data[64]);
+  mpz_import(x2, 32, 1, 1, 0, 0, &data[96]);
+
+  const auto s = libff::alt_bn128_Fr{x0};
+  const auto x = libff::alt_bn128_Fq2{{x1}, {x2}};
+  mpz_clears(x0, x1, x2, nullptr);
+
+  const auto y2 = x.squared() * x + libff::alt_bn128_twist_coeff_b;
+  const auto y = y2.sqrt();
+  libff::alt_bn128_G2 p{x, y, libff::alt_bn128_Fq2::one()};
+  if (!p.is_well_formed())
+    return false;
+
+  // unlikely the generated point will be from G2 subgroup, but it happens.
+  // assert(!(libff::alt_bn128_G2::order() * p).is_zero());
+
+  // TODO: Instead of multiplying, load the S point from data.
+  const auto S = s * libff::alt_bn128_G1::G1_one;
+  const auto nS = -S;
+  encode_g1_element(&data[0], S);
+  encode_g2_element(&data[64], p);
+  encode_g1_element(&data[192], nS);
+  encode_g2_element(&data[192 + 64], p);
+
+  // This will validate to true if subgroup check is missing.
+  // const auto r = libff_pairing_verify({data, 2 * STRIDE_SIZE});
+  // if (r != Result::one) {
+  //   std::cerr << "result: " << int(r) << "\n";
+  //   __builtin_trap();
+  // }
   return true;
 }
