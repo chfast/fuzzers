@@ -171,32 +171,19 @@ static void encode_g2_element(uint8_t out[128],
 
 void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
                         const uint8_t scalars_data[2 * FE_SIZE]) {
-  mpz_t a;
-  mpz_init(a);
-  mpz_import(a, 32, 1, 1, 0, 0, scalars_data);
 
-  mpz_t b;
-  mpz_init(b);
-  mpz_import(b, 32, 1, 1, 0, 0, scalars_data + FE_SIZE);
+  mpz_t x0, x1;
+  mpz_inits(x0, x1, nullptr);
+  mpz_import(x0, 32, 1, 1, 0, 0, scalars_data);
+  mpz_import(x1, 32, 1, 1, 0, 0, scalars_data + FE_SIZE);
+  const auto a = libff::alt_bn128_Fr{x0};
+  const auto b = libff::alt_bn128_Fr{x1};
+  mpz_clears(x0, x1, nullptr);
 
-  mpz_t c;
-  mpz_init(c);
-  mpz_mul(c, a, b);
-
-  mpz_t o;
-  mpz_init(o);
-  libff::alt_bn128_G1::order().to_mpz(o);
-
-  mpz_t mc;
-  mpz_init(mc);
-  mpz_mod(mc, c, o);
-  mpz_t nc;
-  mpz_init(nc);
-  mpz_sub(nc, o, mc);
-
-  const auto A = Scalar{a} * libff::alt_bn128_G1::G1_one;
-  const auto B = Scalar{b} * libff::alt_bn128_G2::G2_one;
-  const auto nC = Scalar{nc} * libff::alt_bn128_G1::G1_one;
+  const auto c = a * b;
+  const auto A = a * libff::alt_bn128_G1::G1_one;
+  const auto B = b * libff::alt_bn128_G2::G2_one;
+  const auto nC = -c * libff::alt_bn128_G1::G1_one;
   const auto G = libff::alt_bn128_G2::G2_one;
 
   encode_g1_element(out, A);
@@ -209,8 +196,6 @@ void libff_generate_abc(uint8_t out[2 * STRIDE_SIZE],
   //   std::cerr << "result: " << int(r) << "\n";
   //   __builtin_trap();
   // }
-
-  mpz_clears(a, b, c, o, mc, nc, nullptr);
 }
 
 bool libff_generate_wrong_g2(uint8_t data[4 * FE_SIZE]) {
