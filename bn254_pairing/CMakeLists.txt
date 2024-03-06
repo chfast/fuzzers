@@ -25,3 +25,9 @@ target_sources(
     impl.hpp
     impl_libff.cpp
 )
+
+add_executable(bn254-pairing-export)
+target_compile_features(bn254-pairing-export PRIVATE cxx_std_23)
+target_link_options(bn254-pairing-export PRIVATE -fsanitize=fuzzer-no-link)
+target_link_libraries(bn254-pairing-export PRIVATE libff::ff)
+target_sources(bn254-pairing-export PRIVATE export.cpp impl_libff.cpp)
