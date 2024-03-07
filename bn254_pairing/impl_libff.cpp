@@ -94,6 +94,73 @@ decode_g2_element(const uint8_t bytes_be[128]) noexcept {
   return point;
 }
 
+static std::optional<libff::alt_bn128_G2>
+decode_g2_element_good(const uint8_t bytes_be[128]) noexcept {
+  std::optional<libff::alt_bn128_Fq2> x{decode_fp2_element(bytes_be)};
+  if (!x) {
+    return {};
+  }
+
+  std::optional<libff::alt_bn128_Fq2> y{decode_fp2_element(bytes_be + 64)};
+  if (!y) {
+    return {};
+  }
+
+  if (x->is_zero() && y->is_zero()) {
+    return libff::alt_bn128_G2::zero();
+  }
+
+  libff::alt_bn128_G2 point{*x, *y, libff::alt_bn128_Fq2::one()};
+  if (!point.is_well_formed()) {
+    return {};
+  }
+
+  if (!(libff::alt_bn128_G2::order() * point).is_zero()) {
+    // wrong order, doesn't belong to the subgroup G2
+    return {};
+  }
+
+  return point;
+}
+
+Result libff_pairing_verify_good(bytes_view input) noexcept {
+  if (input.size() % STRIDE_SIZE != 0) {
+    return Result::invalid_input_length;
+  }
+  const size_t k = input.size() / STRIDE_SIZE;
+
+  init_libff();
+  using namespace libff;
+
+  static const auto one{alt_bn128_Fq12::one()};
+  auto accumulator{one};
+
+  for (size_t i{0}; i < k; ++i) {
+    std::optional<alt_bn128_G1> a{decode_g1_element(&input[i * STRIDE_SIZE])};
+    if (!a) {
+      return Result::invalid_g1;
+    }
+    std::optional<alt_bn128_G2> b{
+        decode_g2_element_good(&input[i * STRIDE_SIZE + 64])};
+    if (!b) {
+      return Result::invalid_g2;
+    }
+
+    if (a->is_zero() || b->is_zero()) {
+      continue;
+    }
+
+    accumulator =
+        accumulator * alt_bn128_miller_loop(alt_bn128_precompute_G1(*a),
+                                            alt_bn128_precompute_G2(*b));
+  }
+
+  if (alt_bn128_final_exponentiation(accumulator) == one) {
+    return Result::one;
+  }
+  return Result::zero;
+}
+
 Result libff_pairing_verify(bytes_view input) noexcept {
   if (input.size() % STRIDE_SIZE != 0) {
     return Result::invalid_input_length;

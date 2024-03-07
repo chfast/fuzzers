@@ -20,6 +20,7 @@ inline constexpr size_t STRIDE_SIZE = 192;
 inline constexpr size_t FE_SIZE = 32;
 
 Result libff_pairing_verify(bytes_view input) noexcept;
+Result libff_pairing_verify_good(bytes_view input) noexcept;
 
 void libff_generate_abc(uint8_t data[2 * STRIDE_SIZE]);
 bool libff_generate_abcd(uint8_t data[2 * STRIDE_SIZE]);

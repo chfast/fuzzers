@@ -1,10 +1,12 @@
 #include "../utils/hex.hpp"
 #include "impl.hpp"
 #include <algorithm>
+#include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <utility>
 #include <vector>
 
 int main(int argc, const char *argv[]) {
@@ -18,7 +20,17 @@ int main(int argc, const char *argv[]) {
     fzz::bytes data(std::istreambuf_iterator<char>{in_file},
                     std::istreambuf_iterator<char>{});
 
-    const auto r = libff_pairing_verify(data);
+    auto r = libff_pairing_verify(data);
+    if (r == Result::invalid_g2_subgroup)
+      r = Result::invalid_g2; // vanilla impl does not recognize subgroup check
+    const auto rgood = libff_pairing_verify_good(data);
+    if (r != rgood) {
+      std::cerr << std::to_underlying(r) << " " << std::to_underlying(rgood)
+                << "\n";
+      libff_pairing_verify(data);
+      libff_pairing_verify_good(data);
+      __builtin_trap();
+    }
     collection[static_cast<int>(r)].emplace_back(std::move(data));
   }
 
