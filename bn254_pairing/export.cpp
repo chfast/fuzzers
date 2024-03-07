@@ -20,11 +20,11 @@ int main(int argc, const char *argv[]) {
     fzz::bytes data(std::istreambuf_iterator<char>{in_file},
                     std::istreambuf_iterator<char>{});
 
-    auto r = libff_pairing_verify(data);
-    if (r == Result::invalid_g2_subgroup)
-      r = Result::invalid_g2; // vanilla impl does not recognize subgroup check
+    const auto r = libff_pairing_verify(data);
+    const auto r_relaxed =
+        r == Result::invalid_g2_subgroup ? Result::invalid_g2 : r;
     const auto rgood = libff_pairing_verify_good(data);
-    if (r != rgood) {
+    if (r_relaxed != rgood) {
       std::cerr << std::to_underlying(r) << " " << std::to_underlying(rgood)
                 << "\n";
       libff_pairing_verify(data);
