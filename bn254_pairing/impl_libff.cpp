@@ -177,20 +177,24 @@ Result libff_pairing_verify(bytes_view input) noexcept {
   for (size_t i{0}; i < k; ++i) {
     auto a{decode_g1_element(&input[i * STRIDE_SIZE])};
     if (!a) {
+      if (!b_in_g2)
+        return Result::invalid_g2_subgroup;
       return Result::invalid_g1;
     }
     auto b{decode_g2_element(&input[i * STRIDE_SIZE + 64])};
     if (!b) {
+      if (!b_in_g2)
+        return Result::invalid_g2_subgroup;
       return Result::invalid_g2;
-    }
-
-    if (a->is_zero() || b->is_zero()) {
-      continue;
     }
 
     if (!(libff::alt_bn128_G2::order() * *b).is_zero()) {
       // wrong order, doesn't belong to the subgroup G2
       b_in_g2 = false;
+    }
+
+    if (a->is_zero() || b->is_zero()) {
+      continue;
     }
 
     accumulator =
