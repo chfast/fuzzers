@@ -1,0 +1,7 @@
+/.idea
+/build
+/corpus
+/venv
+
+crash-*
+oom-*
