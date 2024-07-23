@@ -1,3 +1,6 @@
 [submodule "externals/evmone"]
 	path = externals/evmone
 	url = https://github.com/ethereum/evmone
+[submodule "externals/libff"]
+	path = externals/libff
+	url = https://github.com/chfast/libff
