@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.22...3.27)
 
+# Enable evmone's Hunter before the main project.
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/externals/evmone/cmake/cable)
+include(externals/evmone/cmake/Hunter/init.cmake)
+
 project(fuzzers)
 
 set(BUILD_SHARED_LIBS FALSE)
