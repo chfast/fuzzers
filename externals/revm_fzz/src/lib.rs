@@ -1,19 +1,10 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
-
 #[no_mangle]
-pub extern "C" fn fzz_add(a:u32, b:u32) -> u32 {
-    return add(a as usize, b as usize) as u32
+pub extern "C" fn fzz_revm_validate_eof(data: *const u8, len: usize) -> bool {
+    let slice = unsafe { std::slice::from_raw_parts(data, len) };
+    let b = revm_primitives::Bytes::from(slice);
+    let r = revm_interpreter::analysis::validate_raw_eof(b);
+    match r {
+        Ok(_) => true,
+        Err(_) => false
+    }
 }

@@ -1,5 +1,7 @@
+#pragma once
+#include <cstddef>
 #include <cstdint>
 
 extern "C" {
-  uint32_t fzz_add(uint32_t, uint32_t);
+bool fzz_revm_validate_eof(const uint8_t*, size_t);
 }
