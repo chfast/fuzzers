@@ -112,12 +112,22 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
   assert(v_status != EOFValidationError::impossible);
 
   const auto evm1_ok = v_status == EOFValidationError::success;
-  const auto revm_ok = fzz_revm_validate_eof(data_ptr, data_size);
-  // if (revm_ok != evm1_ok) {
-  //   std::cerr << "evm1: " << v_status << "\n"
-  //             << "revm: " << revm_ok << "\n";
-  //   std::abort();
-  // }
+  switch (v_status) {
+  case EOFValidationError::toplevel_container_truncated: // not implemented
+  case EOFValidationError::too_many_code_sections:       // crashes
+  case EOFValidationError::too_many_container_sections:  // crashes
+  case EOFValidationError::zero_section_size:            // crashes
+    break;
+  default: {
+    std::cerr << "XXXX " << v_status << "\n";
+    const auto revm_ok = fzz_revm_validate_eof(data_ptr, data_size);
+    if (revm_ok != evm1_ok) {
+      std::cerr << "evm1: " << v_status << "\n"
+                << "revm: " << revm_ok << "\n";
+      std::abort();
+    }
+  }
+  }
 
   const auto p_vh_status = std::get_if<EOFValidationError>(&vh);
   assert(p_vh_status == nullptr || *p_vh_status != EOFValidationError::success);
