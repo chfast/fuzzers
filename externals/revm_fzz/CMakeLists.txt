@@ -10,6 +10,7 @@ set_target_properties(revm_fzz PROPERTIES IMPORTED_LOCATION ${LIB_LOCATION})
 
 add_custom_command(
     MAIN_DEPENDENCY src/lib.rs
+    DEPENDS Cargo.toml
     OUTPUT ${LIB_LOCATION}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMAND cargo build --release
