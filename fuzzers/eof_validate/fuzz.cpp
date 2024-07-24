@@ -1,6 +1,7 @@
 #include <evmone/eof.hpp>
 #include <iostream>
 #include <random>
+#include <revm_fzz.hpp>
 #include <test/utils/bytecode.hpp>
 
 using namespace evmone;
@@ -109,6 +110,14 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
   const auto vh = validate_header(REV, data);
   const auto v_status = validate_eof(REV, ContainerKind::runtime, data);
   assert(v_status != EOFValidationError::impossible);
+
+  const auto evm1_ok = v_status == EOFValidationError::success;
+  const auto revm_ok = fzz_revm_validate_eof(data_ptr, data_size);
+  // if (revm_ok != evm1_ok) {
+  //   std::cerr << "evm1: " << v_status << "\n"
+  //             << "revm: " << revm_ok << "\n";
+  //   std::abort();
+  // }
 
   const auto p_vh_status = std::get_if<EOFValidationError>(&vh);
   assert(p_vh_status == nullptr || *p_vh_status != EOFValidationError::success);
