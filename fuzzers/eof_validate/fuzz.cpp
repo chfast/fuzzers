@@ -113,8 +113,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
 
   const auto evm1_ok = v_status == EOFValidationError::success;
   switch (v_status) {
-  case EOFValidationError::success:                    // incorrect
-  case EOFValidationError::unreachable_code_sections:  // incorrect
+  // case EOFValidationError::success:                    // incorrect
+  // case EOFValidationError::unreachable_code_sections:  // incorrect
   case EOFValidationError::invalid_non_returning_flag: // incorrect
     break;
   default: {
