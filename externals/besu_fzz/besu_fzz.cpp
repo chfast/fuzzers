@@ -325,6 +325,10 @@ JVM jvm;
 } // namespace
 
 bool fzz_besu_validate_eof(const uint8_t* data, size_t size) noexcept {
+  // TODO: Besu recognizes legacy by prefix, so don't pass non-EOF code.
+  if (size < 2 || data[0] != 0xEF || data[1] != 0x00)
+    return false;
+
   const auto env = jvm.env;
   const auto byteArr = env->NewByteArray(static_cast<jsize>(size));
   env->SetByteArrayRegion(byteArr, 0, static_cast<jsize>(size),
