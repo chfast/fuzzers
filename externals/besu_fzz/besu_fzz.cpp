@@ -294,6 +294,14 @@ struct JVM {
     JavaVMOption options[] = {
         {.optionString = besu_classpath},
         // {.optionString = "-Xcheck:jni"},
+
+        /* This disables Java's signal handler,
+         * so that aborting the fuzzer (ctrl+c) won't
+         * cause a crash.
+         */
+        {
+            .optionString = (char*)"-Xrs",
+        },
     };
     JavaVMInitArgs vm_args{
         .version = JNI_VERSION_21,
