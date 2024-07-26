@@ -116,9 +116,9 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
 
   const auto evm1_ok = v_status == EOFValidationError::success;
   switch (v_status) {
-  case EOFValidationError::invalid_non_returning_flag: // incorrect
-    // case EOFValidationError::success: // incorrect
-    break;
+  // case EOFValidationError::invalid_non_returning_flag: // incorrect
+  // case EOFValidationError::success:                    // incorrect
+  // break;
   default: {
     // std::cerr << "XXXX " << v_status << "\n";
     const auto revm_ok = fzz_revm_validate_eof(data_ptr, data_size);
@@ -133,8 +133,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
   }
 
   switch (v_status) {
-  case EOFValidationError::invalid_non_returning_flag:
-    break;
+  // case EOFValidationError::invalid_non_returning_flag:
+  // break;
   default: {
     // std::cerr << "XXXX " << v_status << "\n";
     const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
