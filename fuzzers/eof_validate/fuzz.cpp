@@ -133,8 +133,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
   }
 
   switch (v_status) {
-  // case EOFValidationError::invalid_non_returning_flag:
-  // break;
+  case EOFValidationError::incompatible_container_kind:
+    break;
   default: {
     // std::cerr << "XXXX " << v_status << "\n";
     const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
