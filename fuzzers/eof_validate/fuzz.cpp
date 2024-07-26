@@ -1,3 +1,4 @@
+#include <besu_fzz.hpp>
 #include <evmone/eof.hpp>
 #include <iostream>
 #include <random>
@@ -116,6 +117,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
   const auto evm1_ok = v_status == EOFValidationError::success;
   switch (v_status) {
   case EOFValidationError::invalid_non_returning_flag: // incorrect
+    // case EOFValidationError::success: // incorrect
     break;
   default: {
     // std::cerr << "XXXX " << v_status << "\n";
@@ -123,6 +125,22 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
     if (revm_ok != evm1_ok) {
       std::cerr << "evm1: " << v_status << "\n"
                 << "revm: " << revm_ok << "\n"
+                << "code: " << hex(data) << "\n"
+                << "size: " << data.size() << "\n";
+      std::abort();
+    }
+  }
+  }
+
+  switch (v_status) {
+  case EOFValidationError::invalid_non_returning_flag:
+    break;
+  default: {
+    // std::cerr << "XXXX " << v_status << "\n";
+    const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
+    if (ok != evm1_ok) {
+      std::cerr << "evm1: " << v_status << "\n"
+                << "besu: " << ok << "\n"
                 << "code: " << hex(data) << "\n"
                 << "size: " << data.size() << "\n";
       std::abort();
