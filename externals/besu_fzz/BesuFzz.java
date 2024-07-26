@@ -7,8 +7,8 @@ import org.apache.tuweni.bytes.Bytes;
 public final class BesuFzz {
 private final static EVM evm = MainnetEVMs.pragueEOF(EvmConfiguration.DEFAULT);
 
-public static int validateEOF(final byte[] rawCode) {
-        Code code = evm.getCodeUncached(Bytes.wrap(rawCode));
-        return code.isValid() ? 1 : 0;
+public static boolean validateEOF(final byte[] rawCode, int length) {
+        Code code = evm.getCodeUncached(Bytes.wrap(rawCode, 0, length));
+        return code.isValid();
     }
 }

@@ -324,7 +324,7 @@ struct JVM {
       std::abort();
     }
 
-    validateEOF = env->GetStaticMethodID(fzz_class, "validateEOF", "([B)I");
+    validateEOF = env->GetStaticMethodID(fzz_class, "validateEOF", "([BI)Z");
   }
 
   ~JVM() { jvm->DestroyJavaVM(); }
@@ -339,16 +339,17 @@ bool fzz_besu_validate_eof(const uint8_t* data, size_t size) noexcept {
     return false;
 
   const auto env = jvm.env;
-  const auto byteArr = env->NewByteArray(static_cast<jsize>(size));
-  env->SetByteArrayRegion(byteArr, 0, static_cast<jsize>(size),
+  const auto length = static_cast<jsize>(size);
+  const auto byteArr = env->NewByteArray(length);
+  env->SetByteArrayRegion(byteArr, 0, length,
                           reinterpret_cast<const jbyte*>(data));
-  const auto res =
-      env->CallStaticIntMethod(jvm.fzz_class, jvm.validateEOF, byteArr);
+  const auto res = env->CallStaticBooleanMethod(jvm.fzz_class, jvm.validateEOF,
+                                                byteArr, length);
   if (env->ExceptionOccurred() != nullptr) {
     env->ExceptionDescribe();
     env->ExceptionClear();
     std::abort();
   }
   env->DeleteLocalRef(byteArr);
-  return static_cast<bool>(res);
+  return res;
 }
