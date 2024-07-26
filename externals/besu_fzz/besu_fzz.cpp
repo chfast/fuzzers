@@ -289,6 +289,8 @@ struct JVM {
   JavaVM* jvm = nullptr;
   jclass fzz_class = nullptr;
   jmethodID validateEOF = nullptr;
+  jbyteArray byteArr = nullptr;
+  jsize byteArrLen = 1024;
 
   JVM() {
     JavaVMOption options[] = {
@@ -325,6 +327,8 @@ struct JVM {
     }
 
     validateEOF = env->GetStaticMethodID(fzz_class, "validateEOF", "([BI)Z");
+
+    byteArr = env->NewByteArray(byteArrLen);
   }
 
   ~JVM() { jvm->DestroyJavaVM(); }
@@ -340,16 +344,23 @@ bool fzz_besu_validate_eof(const uint8_t* data, size_t size) noexcept {
 
   const auto env = jvm.env;
   const auto length = static_cast<jsize>(size);
-  const auto byteArr = env->NewByteArray(length);
-  env->SetByteArrayRegion(byteArr, 0, length,
+
+  if (jvm.byteArrLen < length) {
+    // This actually does not improve performance and we can just allocate array
+    // each time.
+    env->DeleteLocalRef(jvm.byteArr);
+    jvm.byteArr = env->NewByteArray(length);
+    jvm.byteArrLen = length;
+  }
+
+  env->SetByteArrayRegion(jvm.byteArr, 0, length,
                           reinterpret_cast<const jbyte*>(data));
   const auto res = env->CallStaticBooleanMethod(jvm.fzz_class, jvm.validateEOF,
-                                                byteArr, length);
+                                                jvm.byteArr, length);
   if (env->ExceptionOccurred() != nullptr) {
     env->ExceptionDescribe();
     env->ExceptionClear();
     std::abort();
   }
-  env->DeleteLocalRef(byteArr);
   return res;
 }
