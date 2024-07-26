@@ -302,6 +302,7 @@ struct JVM {
         {
             .optionString = (char*)"-Xrs",
         },
+        {const_cast<char*>("-Xmx512m")}, // max heap size
     };
     JavaVMInitArgs vm_args{
         .version = JNI_VERSION_21,
@@ -348,5 +349,6 @@ bool fzz_besu_validate_eof(const uint8_t* data, size_t size) noexcept {
     env->ExceptionClear();
     std::abort();
   }
+  env->DeleteLocalRef(byteArr);
   return static_cast<bool>(res);
 }
