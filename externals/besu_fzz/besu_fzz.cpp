@@ -304,7 +304,7 @@ struct JVM {
         {
             .optionString = (char*)"-Xrs",
         },
-        {const_cast<char*>("-Xmx512m")}, // max heap size
+        // {const_cast<char*>("-Xmx512m")}, // max heap size
     };
     JavaVMInitArgs vm_args{
         .version = JNI_VERSION_21,
