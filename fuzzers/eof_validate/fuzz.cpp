@@ -106,6 +106,7 @@ size_t LLVMFuzzerCustomMutator(uint8_t* data_ptr, size_t data_size,
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
+  // FIXME: Fix evmone API to properly handle inputs above the limit.
   if (data_size > 0xc000)
     return -1;
   const bytes_view data{data_ptr, data_size};
@@ -133,8 +134,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
   }
 
   switch (v_status) {
-  case EOFValidationError::incompatible_container_kind:
-    break;
+  // case EOFValidationError::incompatible_container_kind:
+  // break;
   default: {
     // std::cerr << "XXXX " << v_status << "\n";
     const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
