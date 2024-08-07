@@ -28,5 +28,6 @@ add_custom_command(
     -d ${CMAKE_CURRENT_BINARY_DIR}
     -classpath ${BESU_CLASSPATH}
     -proc:none
+    DEPENDS BesuFzz.java  # FIXME: java is not rebuilt if source changes.
     BYPRODUCTS BesuFzz.class
 )
