@@ -1,74 +1,13 @@
+#include "eof_validate.hpp"
 #include <besu_fzz.hpp>
-#include <evmone/eof.hpp>
 #include <iostream>
-#include <random>
 #include <revm_fzz.hpp>
 #include <test/utils/bytecode.hpp>
 
 using namespace evmone;
 
-extern "C" size_t LLVMFuzzerMutate(uint8_t* data, size_t size,
-                                   size_t max_size) noexcept;
-
+namespace fzz {
 namespace {
-constexpr auto REV = EVMC_PRAGUE;
-
-enum class EOFErrCat { header, body, type, code, subcont, other };
-
-EOFErrCat get_cat(EOFValidationError err) noexcept {
-  using enum EOFValidationError;
-  switch (err) {
-  case invalid_prefix:
-  case eof_version_unknown:
-  case header_terminator_missing:
-  case type_section_missing:
-  case code_section_missing:
-  case data_section_missing:
-  case section_headers_not_terminated:
-  case zero_section_size:
-  case incomplete_section_size:
-  case incomplete_section_number:
-  case too_many_code_sections:
-  case too_many_container_sections:
-  case invalid_type_section_size:
-    return EOFErrCat::header;
-  case invalid_section_bodies_size:
-    return EOFErrCat::body;
-  case invalid_first_section_type:
-  case max_stack_height_above_limit:
-  case toplevel_container_truncated: // ?
-    return EOFErrCat::type;
-  case undefined_instruction:
-  case truncated_instruction:
-  case invalid_container_section_index:
-  case stack_underflow: // stack?
-  case unreachable_instructions:
-  case invalid_code_section_index:
-  case invalid_rjump_destination:
-  case callf_to_non_returning_function:
-  case invalid_dataloadn_index:
-  case no_terminating_instruction:
-  case invalid_non_returning_flag: // ?
-  case invalid_max_stack_height:   // stack?
-  case stack_height_mismatch:      // stack?
-  case incompatible_container_kind:
-    return EOFErrCat::code;
-  case unreferenced_subcontainer:
-    return EOFErrCat::subcont;
-  case unreachable_code_sections:
-  case stack_higher_than_outputs_required:
-  case inputs_outputs_num_above_limit:
-  case stack_overflow:
-  case jumpf_destination_incompatible_outputs:
-  case eofcreate_with_truncated_container:
-  case ambiguous_container_kind:
-  case container_size_above_limit:
-    return EOFErrCat::other;
-  case success:
-  case impossible:
-    __builtin_unreachable();
-  }
-}
 
 [[maybe_unused]] EOFValidationError
 to_header_validation_error(EOFValidationError err) noexcept {
@@ -86,83 +25,13 @@ to_header_validation_error(EOFValidationError err) noexcept {
   }
 }
 
-size_t mutate_part(const uint8_t* data, size_t data_size, size_t data_max_size,
-                   uint8_t* part, size_t part_size) {
-  const auto part_end = part + part_size;
-  const auto size_available = data_max_size - data_size;
-  const auto after_size = static_cast<size_t>((data + data_size - part_end));
-  std::memmove(part_end + size_available, part_end, after_size);
-  const auto part_new_size =
-      LLVMFuzzerMutate(part, part_size, part_size + size_available);
-  const auto part_new_end = part + part_new_size;
-  std::memmove(part_new_end, part_end + size_available, after_size);
-  const auto size_diff = part_new_size - part_size;
-  return data_size + size_diff;
-}
-
-size_t mutate_container(uint8_t* data_ptr, size_t data_size,
-                        size_t data_max_size, unsigned int seed) {
-  const bytes_view data{data_ptr, data_size};
-
-  const auto vh = validate_header(REV, data);
-  if (std::holds_alternative<EOFValidationError>(vh))
-    return LLVMFuzzerMutate(data_ptr, data_size, data_max_size);
-
-  const auto& header = std::get<EOF1Header>(vh);
-  const auto c_codes = header.code_sizes.size();
-  const auto c_subcontainers = header.container_sizes.size();
-  const auto c_all = c_codes + c_subcontainers + 2;
-  const auto idx = seed % c_all;
-
-  if (idx == 0) // types
-  {
-    assert(!header.code_offsets.empty());
-    const auto types_end = &data_ptr[header.code_offsets.front()];
-    const auto types_size = c_codes * 4;
-    const auto types_begin = types_end - types_size;
-    return mutate_part(data_ptr, data_size, data_max_size, types_begin,
-                       types_size);
-  } else if (idx == c_all - 1) // data
-  {
-    const auto d_begin = &data_ptr[header.data_offset];
-    const auto d_size = static_cast<size_t>((data_ptr + data_size - d_begin));
-    return mutate_part(data_ptr, data_size, data_max_size, d_begin, d_size);
-  } else if (idx <= c_codes) {
-    const auto code_idx = idx - 1;
-    const auto code_begin = &data_ptr[header.code_offsets[code_idx]];
-    const auto code_size = header.code_sizes[code_idx];
-    return mutate_part(data_ptr, data_size, data_max_size, code_begin,
-                       code_size);
-  } else {
-    const auto cont_idx = idx - 1 - c_codes;
-    const auto cont_begin = &data_ptr[header.container_offsets[cont_idx]];
-    const auto cont_size = header.container_sizes[cont_idx];
-    const auto partEnd = cont_begin + cont_size;
-    const auto sizeAvailable = data_max_size - data_size;
-    const auto afterSize =
-        static_cast<size_t>((data_ptr + data_size - partEnd));
-    std::memmove(partEnd + sizeAvailable, partEnd, afterSize);
-
-    const auto seed2 = static_cast<unsigned int>(std::minstd_rand{seed}());
-    const auto partNewSize = mutate_container(cont_begin, cont_size,
-                                              cont_size + sizeAvailable, seed2);
-
-    const auto partNewEnd = cont_begin + partNewSize;
-    std::memmove(partNewEnd, partEnd + sizeAvailable, afterSize);
-    const auto sizeDiff = partNewSize - cont_size;
-    return data_size + sizeDiff;
-  }
-}
 } // namespace
+} // namespace fzz
 
-extern "C" {
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
+                                      size_t data_size) noexcept {
+  using namespace fzz;
 
-size_t LLVMFuzzerCustomMutator(uint8_t* data_ptr, size_t data_size,
-                               size_t data_max_size, unsigned int seed) {
-  return mutate_container(data_ptr, data_size, data_max_size, seed);
-}
-
-int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
   // FIXME: Fix evmone API to properly handle inputs above the limit.
   if (data_size > 0xc000)
     return -1;
@@ -264,5 +133,4 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
     }
   }
   return 0;
-}
 }

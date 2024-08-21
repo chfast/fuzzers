@@ -5,4 +5,5 @@ target_sources(
     eof-validate
     PRIVATE
     fuzz.cpp
+    mutator.cpp
 )
