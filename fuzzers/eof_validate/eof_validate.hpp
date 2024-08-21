@@ -40,17 +40,17 @@ inline EOFErrCat get_cat(evmone::EOFValidationError err) noexcept {
   case callf_to_non_returning_function:
   case invalid_dataloadn_index:
   case no_terminating_instruction:
-  case invalid_non_returning_flag: // ?
-  case invalid_max_stack_height:   // stack?
-  case stack_height_mismatch:      // stack?
-  case stack_overflow:             // stack?
+  case invalid_non_returning_flag:         // ?
+  case invalid_max_stack_height:           // stack?
+  case stack_height_mismatch:              // stack?
+  case stack_overflow:                     // stack?
+  case stack_higher_than_outputs_required: // stack?
   case incompatible_container_kind:
     return EOFErrCat::code;
   case unreferenced_subcontainer:
     return EOFErrCat::subcont;
   case unreachable_code_sections:
     return EOFErrCat::ref;
-  case stack_higher_than_outputs_required:
   case jumpf_destination_incompatible_outputs:
   case eofcreate_with_truncated_container:
   case ambiguous_container_kind:
