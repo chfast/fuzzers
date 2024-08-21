@@ -1,13 +1,24 @@
 #include "eof_validate.hpp"
+#include "evmone/constants.hpp"
+
 #include <evmc/hex.hpp>
 #include <iostream>
 #include <random>
+#include <span>
 
 extern "C" size_t LLVMFuzzerMutate(uint8_t* data, size_t size,
                                    size_t max_size) noexcept;
 
 namespace fzz {
 namespace {
+
+std::span<uint8_t> get_types(const evmone::EOF1Header& header,
+                             uint8_t* data) noexcept {
+  const auto size = header.code_sizes.size() * 4;
+  const auto end_pos = header.code_offsets[0];
+  const auto begin_pos = end_pos - size;
+  return {data + begin_pos, size};
+}
 
 class EOFMutator {
   uint8_t* data_;
@@ -18,12 +29,61 @@ class EOFMutator {
   size_t mutate_types(const evmone::EOF1Header& header) {
     // Just mutate the type section in-place without changing its size.
     // TODO: Any better ideas?
-    const auto size = header.code_sizes.size() * 4;
-    const auto end_pos = header.code_offsets[0];
-    const auto begin_pos = end_pos - size;
-    const auto begin = data_ + begin_pos;
-    LLVMFuzzerMutate(begin, size, size);
+    const auto types = get_types(header, data_);
+    LLVMFuzzerMutate(types.data(), types.size(), types.size());
     return size_;
+  }
+
+  // Mutate code section together with its type.
+  // TODO: Alternatives:
+  // - mutate type and code section separately.
+  // - mutate type in the context of the whole type section.
+  size_t mutate_code(size_t code_idx, const evmone::EOF1Header& header) {
+
+    const evmc::bytes orig{data_, size_};
+
+    uint8_t scratch[evmone::MAX_INITCODE_SIZE];
+    const auto extra_size = max_size_ - size_;
+    const auto types = get_types(header, data_);
+    const auto type_ptr = &types[code_idx * 4];
+    const size_t code_off = header.code_offsets[code_idx];
+    const size_t code_size = header.code_sizes[code_idx];
+
+    std::memcpy(scratch, type_ptr, 4);
+    std::memcpy(scratch + 4, data_ + code_off, code_size);
+    const size_t type_code_size = code_size + 4;
+
+    const auto new_type_code_size =
+        LLVMFuzzerMutate(scratch, type_code_size, type_code_size + extra_size);
+    std::memcpy(type_ptr, scratch, 4);
+    const auto new_code_size = new_type_code_size - 4;
+    assert(new_code_size <= 0xffff);
+    const size_t after_pos = code_off + code_size;
+    const auto after_size = size_ - after_pos;
+    const auto new_after_pos = after_pos + (new_code_size - code_size);
+    std::memmove(data_ + new_after_pos, data_ + after_pos, after_size);
+    std::memcpy(data_ + code_off, scratch + 4, new_code_size);
+    const auto new_size = size_ + (new_code_size - code_size);
+
+    // Patch size in header.
+    const auto code_size_off = 3 + 3 + 3 + 4 * code_idx;
+    data_[code_size_off] = new_code_size >> 8;
+    data_[code_size_off + 1] = new_code_size;
+
+    // Validate.
+    const auto header_or_err = evmone::validate_header(REV, {data_, new_size});
+    if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
+      const auto err = get<evmone::EOFValidationError>(header_or_err);
+      if (get_cat(err) == EOFErrCat::header ||
+          get_cat(err) == EOFErrCat::body) {
+        std::cerr << "code mutation failed: " << err << "\n"
+                  << evmc::hex(orig) << "\n"
+                  << evmc::hex({data_, new_size}) << "\n";
+        std::abort();
+      }
+    }
+
+    return new_size;
   }
 
 public:
@@ -66,6 +126,10 @@ public:
 
     if (elem_idx == 0)
       return mutate_types(header);
+
+    const auto code_idx = elem_idx - 1;
+    if (code_idx < header.code_sizes.size())
+      return mutate_code(code_idx, header);
 
     // TODO:
     return LLVMFuzzerMutate(data_, size_, max_size_);
