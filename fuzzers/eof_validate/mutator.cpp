@@ -2,6 +2,7 @@
 #include "evmone/constants.hpp"
 
 #include <evmc/hex.hpp>
+#include <intx/intx.hpp>
 #include <iostream>
 #include <random>
 #include <span>
@@ -40,6 +41,7 @@ class EOFMutator {
   // - mutate type in the context of the whole type section.
   size_t mutate_code(size_t code_idx, const evmone::EOF1Header& header) {
 
+    // TODO: Remove when stable.
     const evmc::bytes orig{data_, size_};
 
     uint8_t scratch[evmone::MAX_INITCODE_SIZE];
@@ -96,6 +98,51 @@ class EOFMutator {
     return new_size;
   }
 
+  size_t mutate_subcontainer(size_t cont_idx,
+                             const evmone::EOF1Header& header) {
+    const evmone::bytes_view container{data_, size_};
+    const auto subcontainer = header.get_container(container, cont_idx);
+
+    uint8_t scratch[evmone::MAX_INITCODE_SIZE];
+    const auto extra_size = max_size_ - size_;
+    std::memcpy(scratch, subcontainer.data(), subcontainer.size());
+
+    const auto new_subcontainer_size =
+        EOFMutator{scratch, subcontainer.size(),
+                   subcontainer.size() + extra_size,
+                   static_cast<uint32_t>(rand_())}
+            .mutate();
+    const auto size_diff = new_subcontainer_size - subcontainer.size();
+    const auto after = subcontainer.data() + subcontainer.size();
+    const auto new_after = after + size_diff;
+    const auto after_size = size_ - (after - data_);
+    std::memmove(const_cast<uint8_t*>(new_after), after, after_size);
+
+    std::memcpy(const_cast<uint8_t*>(subcontainer.data()), scratch,
+                new_subcontainer_size);
+
+    const auto container_size_off =
+        3 + 3 + 3 + 2 * header.code_sizes.size() + 3 + 2 * cont_idx;
+    data_[container_size_off] = new_subcontainer_size >> 8;
+    data_[container_size_off + 1] = new_subcontainer_size;
+
+    const auto new_size = size_ + size_diff;
+
+    // Validate.
+    const auto header_or_err = evmone::validate_header(REV, {data_, new_size});
+    if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
+      const auto err = get<evmone::EOFValidationError>(header_or_err);
+      if (get_cat(err) == EOFErrCat::header ||
+          get_cat(err) == EOFErrCat::body) {
+        std::cerr << "subcontainer mutation failed: " << err << "\n"
+                  << evmc::hex({data_, new_size}) << "\n";
+        std::abort();
+      }
+    }
+
+    return new_size;
+  }
+
 public:
   EOFMutator(uint8_t* data, size_t size, size_t max_size, uint32_t seed)
       : data_{data}, size_{size}, max_size_{max_size}, rand_{seed} {}
@@ -140,6 +187,12 @@ public:
     const auto code_idx = elem_idx - 1;
     if (code_idx < header.code_sizes.size())
       return mutate_code(code_idx, header);
+
+    const auto cont_idx = code_idx - header.code_sizes.size();
+    if (cont_idx < header.container_sizes.size())
+      return mutate_subcontainer(cont_idx, header);
+
+    assert(elem_idx == total_count - 2);
 
     // TODO:
     return LLVMFuzzerMutate(data_, size_, max_size_);
