@@ -6,28 +6,6 @@
 
 using namespace evmone;
 
-namespace fzz {
-namespace {
-
-[[maybe_unused]] EOFValidationError
-to_header_validation_error(EOFValidationError err) noexcept {
-  using enum EOFValidationError;
-  switch (err) {
-  case no_terminating_instruction:
-  case stack_underflow:
-  case stack_overflow:
-  case toplevel_container_truncated: // ?
-  case undefined_instruction:
-  case invalid_max_stack_height:
-    return success;
-  default:
-    return err;
-  }
-}
-
-} // namespace
-} // namespace fzz
-
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
                                       size_t data_size) noexcept {
   using namespace fzz;
@@ -37,24 +15,18 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
     return -1;
   const bytes_view data{data_ptr, data_size};
 
-  // Play with error categories.
-  {
-    const auto err = validate_eof(REV, ContainerKind::runtime, data);
-
-    if (err == EOFValidationError::success)
-      return 0;
-
-    const auto cat = get_cat(err);
-    if (cat == EOFErrCat::other) {
-      std::cerr << err << "\n";
-      __builtin_trap();
-    }
-    return 0;
-  }
-
   const auto vh = validate_header(REV, data);
   const auto v_status = validate_eof(REV, ContainerKind::runtime, data);
   assert(v_status != EOFValidationError::impossible);
+
+  if (v_status != EOFValidationError::success) {
+    // Inspect found categories.
+    const auto cat = get_cat(v_status);
+    if (cat == EOFErrCat::other) {
+      std::cerr << v_status << "\n";
+      std::abort();
+    }
+  }
 
   const auto evm1_ok = v_status == EOFValidationError::success;
   switch (v_status) {
@@ -74,22 +46,21 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   }
   }
 
-  // FIXME: Besu disabled
-  // switch (v_status) {
-  // // case EOFValidationError::incompatible_container_kind:
-  // // break;
-  // default: {
-  //   // std::cerr << "XXXX " << v_status << "\n";
-  //   const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
-  //   if (ok != evm1_ok) {
-  //     std::cerr << "evm1: " << v_status << "\n"
-  //               << "besu: " << ok << "\n"
-  //               << "code: " << hex(data) << "\n"
-  //               << "size: " << data.size() << "\n";
-  //     std::abort();
-  //   }
-  // }
-  // }
+  switch (v_status) {
+  // case EOFValidationError::incompatible_container_kind:
+  // break;
+  default: {
+    // std::cerr << "XXXX " << v_status << "\n";
+    const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
+    if (ok != evm1_ok) {
+      std::cerr << "evm1: " << v_status << "\n"
+                << "besu: " << ok << "\n"
+                << "code: " << hex(data) << "\n"
+                << "size: " << data.size() << "\n";
+      std::abort();
+    }
+  }
+  }
 
   const auto p_vh_status = std::get_if<EOFValidationError>(&vh);
   assert(p_vh_status == nullptr || *p_vh_status != EOFValidationError::success);
@@ -100,15 +71,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   if (v_status == EOFValidationError::success &&
       vh_status != EOFValidationError::success)
     __builtin_trap();
-
-  //    if (const auto expected = to_header_validation_error(v_status);
-  //    vh_status != expected)
-  //    {
-  //        std::cerr << "vh_status: " << vh_status << "\nexpected:  " <<
-  //        expected
-  //                  << "\neof: " << evmc::hex(data) << "\n";
-  //        __builtin_trap();
-  //    }
 
   if (v_status == EOFValidationError::success) {
     const auto h = read_valid_eof1_header(data);
