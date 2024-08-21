@@ -147,6 +147,21 @@ public:
   EOFMutator(uint8_t* data, size_t size, size_t max_size, uint32_t seed)
       : data_{data}, size_{size}, max_size_{max_size}, rand_{seed} {}
 
+  size_t mutate_data(const evmone::EOF1Header& header) {
+    const auto data = header.get_data({data_, size_});
+    const auto extra_size = max_size_ - size_;
+    const auto new_data_size =
+        LLVMFuzzerMutate(const_cast<uint8_t*>(data.data()), data.size(),
+                         data.size() + extra_size);
+    const auto data_size_off = 3 + 3 + 3 + 2 * header.code_sizes.size() + 3 +
+                               2 * header.container_sizes.size() + 3;
+    data_[data_size_off] = new_data_size >> 8;
+    data_[data_size_off + 1] = new_data_size;
+
+    const auto size_diff = new_data_size - data.size();
+    return size_ + size_diff;
+  }
+
   size_t mutate() {
     evmone::bytes_view container{data_, size_};
 
@@ -193,9 +208,7 @@ public:
       return mutate_subcontainer(cont_idx, header);
 
     assert(elem_idx == total_count - 2);
-
-    // TODO:
-    return LLVMFuzzerMutate(data_, size_, max_size_);
+    return mutate_data(header);
   }
 };
 
