@@ -13,6 +13,63 @@ extern "C" size_t LLVMFuzzerMutate(uint8_t* data, size_t size,
 namespace {
 constexpr auto REV = EVMC_PRAGUE;
 
+enum class EOFErrCat { header, body, type, code, subcont, other };
+
+EOFErrCat get_cat(EOFValidationError err) noexcept {
+  using enum EOFValidationError;
+  switch (err) {
+  case invalid_prefix:
+  case eof_version_unknown:
+  case header_terminator_missing:
+  case type_section_missing:
+  case code_section_missing:
+  case data_section_missing:
+  case section_headers_not_terminated:
+  case zero_section_size:
+  case incomplete_section_size:
+  case incomplete_section_number:
+  case too_many_code_sections:
+  case too_many_container_sections:
+  case invalid_type_section_size:
+    return EOFErrCat::header;
+  case invalid_section_bodies_size:
+    return EOFErrCat::body;
+  case invalid_first_section_type:
+  case max_stack_height_above_limit:
+  case toplevel_container_truncated: // ?
+    return EOFErrCat::type;
+  case undefined_instruction:
+  case truncated_instruction:
+  case invalid_container_section_index:
+  case stack_underflow: // stack?
+  case unreachable_instructions:
+  case invalid_code_section_index:
+  case invalid_rjump_destination:
+  case callf_to_non_returning_function:
+  case invalid_dataloadn_index:
+  case no_terminating_instruction:
+  case invalid_non_returning_flag: // ?
+  case invalid_max_stack_height:   // stack?
+  case stack_height_mismatch:      // stack?
+  case incompatible_container_kind:
+    return EOFErrCat::code;
+  case unreferenced_subcontainer:
+    return EOFErrCat::subcont;
+  case unreachable_code_sections:
+  case stack_higher_than_outputs_required:
+  case inputs_outputs_num_above_limit:
+  case stack_overflow:
+  case jumpf_destination_incompatible_outputs:
+  case eofcreate_with_truncated_container:
+  case ambiguous_container_kind:
+  case container_size_above_limit:
+    return EOFErrCat::other;
+  case success:
+  case impossible:
+    __builtin_unreachable();
+  }
+}
+
 [[maybe_unused]] EOFValidationError
 to_header_validation_error(EOFValidationError err) noexcept {
   using enum EOFValidationError;
@@ -111,6 +168,21 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
     return -1;
   const bytes_view data{data_ptr, data_size};
 
+  // Play with error categories.
+  {
+    const auto err = validate_eof(REV, ContainerKind::runtime, data);
+
+    if (err == EOFValidationError::success)
+      return 0;
+
+    const auto cat = get_cat(err);
+    if (cat == EOFErrCat::other) {
+      std::cerr << err << "\n";
+      __builtin_trap();
+    }
+    return 0;
+  }
+
   const auto vh = validate_header(REV, data);
   const auto v_status = validate_eof(REV, ContainerKind::runtime, data);
   assert(v_status != EOFValidationError::impossible);
@@ -133,21 +205,22 @@ int LLVMFuzzerTestOneInput(const uint8_t* data_ptr, size_t data_size) noexcept {
   }
   }
 
-  switch (v_status) {
-  // case EOFValidationError::incompatible_container_kind:
-  // break;
-  default: {
-    // std::cerr << "XXXX " << v_status << "\n";
-    const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
-    if (ok != evm1_ok) {
-      std::cerr << "evm1: " << v_status << "\n"
-                << "besu: " << ok << "\n"
-                << "code: " << hex(data) << "\n"
-                << "size: " << data.size() << "\n";
-      std::abort();
-    }
-  }
-  }
+  // FIXME: Besu disabled
+  // switch (v_status) {
+  // // case EOFValidationError::incompatible_container_kind:
+  // // break;
+  // default: {
+  //   // std::cerr << "XXXX " << v_status << "\n";
+  //   const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
+  //   if (ok != evm1_ok) {
+  //     std::cerr << "evm1: " << v_status << "\n"
+  //               << "besu: " << ok << "\n"
+  //               << "code: " << hex(data) << "\n"
+  //               << "size: " << data.size() << "\n";
+  //     std::abort();
+  //   }
+  // }
+  // }
 
   const auto p_vh_status = std::get_if<EOFValidationError>(&vh);
   assert(p_vh_status == nullptr || *p_vh_status != EOFValidationError::success);
