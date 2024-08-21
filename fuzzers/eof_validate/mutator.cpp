@@ -1,4 +1,6 @@
 #include "eof_validate.hpp"
+#include <evmc/hex.hpp>
+#include <iostream>
 #include <random>
 
 extern "C" size_t LLVMFuzzerMutate(uint8_t* data, size_t size,
@@ -13,11 +15,60 @@ class EOFMutator {
   size_t max_size_;
   std::minstd_rand rand_;
 
+  size_t mutate_types(const evmone::EOF1Header& header) {
+    // Just mutate the type section in-place without changing its size.
+    // TODO: Any better ideas?
+    const auto size = header.code_sizes.size() * 4;
+    const auto end_pos = header.code_offsets[0];
+    const auto begin_pos = end_pos - size;
+    const auto begin = data_ + begin_pos;
+    LLVMFuzzerMutate(begin, size, size);
+    return size_;
+  }
+
 public:
   EOFMutator(uint8_t* data, size_t size, size_t max_size, uint32_t seed)
       : data_{data}, size_{size}, max_size_{max_size}, rand_{seed} {}
 
-  size_t mutate() { return LLVMFuzzerMutate(data_, size_, max_size_); }
+  size_t mutate() {
+    evmone::bytes_view container{data_, size_};
+
+    const auto err =
+        evmone::validate_eof(REV, evmone::ContainerKind::runtime, container);
+    const auto err_cat = get_cat(err);
+    if (err_cat == EOFErrCat::header || err_cat == EOFErrCat::body) {
+      // If we have invalid header let's keep default fuzzing until it generates
+      // something reasonable.
+      // TODO: We also do this for "body" for now because out of better ideas.
+      return LLVMFuzzerMutate(data_, size_, max_size_);
+    }
+
+    const auto header_or_err = evmone::validate_header(REV, container);
+    if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
+      std::cerr << "err: "
+                << std::get<evmone::EOFValidationError>(header_or_err)
+                << "\ncat: " << (int)err_cat << "\n"
+                << "eof: " << evmc::hex(container) << "\n";
+      std::abort();
+    }
+
+    const auto& header = std::get<evmone::EOF1Header>(header_or_err);
+
+    const auto total_count = header.code_sizes.size() +
+                             header.container_sizes.size() +
+                             (header.data_size != 0) + 1;
+
+    const auto elem_idx = rand_() % total_count;
+
+    if (elem_idx == total_count - 1) // special index, mutate whole container
+      return LLVMFuzzerMutate(data_, size_, max_size_);
+
+    if (elem_idx == 0)
+      return mutate_types(header);
+
+    // TODO:
+    return LLVMFuzzerMutate(data_, size_, max_size_);
+  }
 };
 
 size_t mutate_part(const uint8_t* data, size_t data_size, size_t data_max_size,
