@@ -4,7 +4,7 @@
 namespace fzz {
 constexpr auto REV = EVMC_PRAGUE;
 
-enum class EOFErrCat { header, body, type, code, subcont, other };
+enum class EOFErrCat { header, body, type, code, subcont, ref, other };
 
 inline EOFErrCat get_cat(evmone::EOFValidationError err) noexcept {
   using enum evmone::EOFValidationError;
@@ -26,6 +26,7 @@ inline EOFErrCat get_cat(evmone::EOFValidationError err) noexcept {
   case invalid_section_bodies_size:
     return EOFErrCat::body;
   case invalid_first_section_type:
+  case inputs_outputs_num_above_limit:
   case max_stack_height_above_limit:
   case toplevel_container_truncated: // ?
     return EOFErrCat::type;
@@ -42,22 +43,25 @@ inline EOFErrCat get_cat(evmone::EOFValidationError err) noexcept {
   case invalid_non_returning_flag: // ?
   case invalid_max_stack_height:   // stack?
   case stack_height_mismatch:      // stack?
+  case stack_overflow:             // stack?
   case incompatible_container_kind:
     return EOFErrCat::code;
   case unreferenced_subcontainer:
     return EOFErrCat::subcont;
   case unreachable_code_sections:
+    return EOFErrCat::ref;
   case stack_higher_than_outputs_required:
-  case inputs_outputs_num_above_limit:
-  case stack_overflow:
   case jumpf_destination_incompatible_outputs:
   case eofcreate_with_truncated_container:
   case ambiguous_container_kind:
   case container_size_above_limit:
     return EOFErrCat::other;
   case success:
+    assert(!"success");
+    __builtin_trap();
   case impossible:
-    __builtin_unreachable();
+    assert(!"impossible");
+    __builtin_trap();
   }
 }
 

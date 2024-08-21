@@ -35,21 +35,22 @@ public:
 
     const auto err =
         evmone::validate_eof(REV, evmone::ContainerKind::runtime, container);
-    const auto err_cat = get_cat(err);
-    if (err_cat == EOFErrCat::header || err_cat == EOFErrCat::body) {
-      // If we have invalid header let's keep default fuzzing until it generates
-      // something reasonable.
-      // TODO: We also do this for "body" for now because out of better ideas.
-      return LLVMFuzzerMutate(data_, size_, max_size_);
+    if (err != evmone::EOFValidationError::success) {
+      const auto err_cat = get_cat(err);
+      if (err_cat == EOFErrCat::header || err_cat == EOFErrCat::body) {
+        // If we have invalid header let's keep default fuzzing until it
+        // generates something reasonable.
+        // TODO: We also do this for "body" for now because out of better ideas.
+        return LLVMFuzzerMutate(data_, size_, max_size_);
+      }
     }
 
     const auto header_or_err = evmone::validate_header(REV, container);
     if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
-      std::cerr << "err: "
-                << std::get<evmone::EOFValidationError>(header_or_err)
-                << "\ncat: " << (int)err_cat << "\n"
-                << "eof: " << evmc::hex(container) << "\n";
-      std::abort();
+      // TODO(evmone): validate_header also validates types.
+      assert(get<evmone::EOFValidationError>(header_or_err) == err);
+      assert(get_cat(err) == EOFErrCat::type);
+      return LLVMFuzzerMutate(data_, size_, max_size_);
     }
 
     const auto& header = std::get<evmone::EOF1Header>(header_or_err);
