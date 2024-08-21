@@ -6,6 +6,20 @@ extern "C" size_t LLVMFuzzerMutate(uint8_t* data, size_t size,
 
 namespace fzz {
 namespace {
+
+class EOFMutator {
+  uint8_t* data_;
+  size_t size_;
+  size_t max_size_;
+  std::minstd_rand rand_;
+
+public:
+  EOFMutator(uint8_t* data, size_t size, size_t max_size, uint32_t seed)
+      : data_{data}, size_{size}, max_size_{max_size}, rand_{seed} {}
+
+  size_t mutate() { return LLVMFuzzerMutate(data_, size_, max_size_); }
+};
+
 size_t mutate_part(const uint8_t* data, size_t data_size, size_t data_max_size,
                    uint8_t* part, size_t part_size) {
   const auto part_end = part + part_size;
@@ -77,8 +91,9 @@ size_t mutate_container(uint8_t* data_ptr, size_t data_size,
 } // namespace
 } // namespace fzz
 
-extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data_ptr, size_t data_size,
-                                          size_t data_max_size,
-                                          unsigned int seed) {
-  return fzz::mutate_container(data_ptr, data_size, data_max_size, seed);
+extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
+                                          size_t max_size, unsigned seed) {
+
+  return fzz::EOFMutator{data, size, max_size, seed}.mutate();
+  // return fzz::mutate_container(data_ptr, data_size, data_max_size, seed);
 }
