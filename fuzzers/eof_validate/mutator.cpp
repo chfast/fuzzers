@@ -56,7 +56,14 @@ class EOFMutator {
     const auto new_type_code_size =
         LLVMFuzzerMutate(scratch, type_code_size, type_code_size + extra_size);
     std::memcpy(type_ptr, scratch, 4);
-    const auto new_code_size = new_type_code_size - 4;
+
+    // Keep the code size at least 1.
+    // TODO: Having 0 will make the header invalid.
+    const auto new_code_size = std::max(new_type_code_size, size_t{5}) - 4;
+    if (new_code_size > 0xffff) {
+      std::cerr << code_idx << " " << code_off << " " << code_size << " "
+                << extra_size << " " << new_code_size << "\n";
+    }
     assert(new_code_size <= 0xffff);
     const size_t after_pos = code_off + code_size;
     const auto after_size = size_ - after_pos;
@@ -66,7 +73,7 @@ class EOFMutator {
     const auto new_size = size_ + (new_code_size - code_size);
 
     // Patch size in header.
-    const auto code_size_off = 3 + 3 + 3 + 4 * code_idx;
+    const auto code_size_off = 3 + 3 + 3 + 2 * code_idx;
     data_[code_size_off] = new_code_size >> 8;
     data_[code_size_off + 1] = new_code_size;
 
@@ -77,6 +84,9 @@ class EOFMutator {
       if (get_cat(err) == EOFErrCat::header ||
           get_cat(err) == EOFErrCat::body) {
         std::cerr << "code mutation failed: " << err << "\n"
+                  << "idx: " << code_idx << "\n"
+                  << "new code size: " << new_code_size << "\n"
+                  << "new code type: " << evmc::hex({scratch, 4}) << "\n"
                   << evmc::hex(orig) << "\n"
                   << evmc::hex({data_, new_size}) << "\n";
         std::abort();
