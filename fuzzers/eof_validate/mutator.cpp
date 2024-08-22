@@ -179,7 +179,7 @@ public:
         // If we have invalid header let's keep default fuzzing until it
         // generates something reasonable.
         // TODO: We also do this for "body" for now because out of better ideas.
-        return LLVMFuzzerMutate(data_, size_, max_size_);
+        return mutate_all();
       }
     }
 
@@ -188,7 +188,7 @@ public:
       // TODO(evmone): validate_header also validates types.
       assert(get<evmone::EOFValidationError>(header_or_err) == err);
       assert(get_cat(err) == EOFErrCat::type);
-      return LLVMFuzzerMutate(data_, size_, max_size_);
+      return mutate_all();
     }
 
     hdr_ = std::get<evmone::EOF1Header>(std::move(header_or_err));
