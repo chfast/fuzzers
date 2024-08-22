@@ -42,7 +42,7 @@ class EOFMutator {
   size_t mutate_code(size_t code_idx, const evmone::EOF1Header& header) {
 
     // TODO: Remove when stable.
-    const evmc::bytes orig{data_, size_};
+    // const evmc::bytes orig{data_, size_};
 
     uint8_t scratch[evmone::MAX_INITCODE_SIZE];
     const auto extra_size = max_size_ - size_;
@@ -88,8 +88,9 @@ class EOFMutator {
         std::cerr << "code mutation failed: " << err << "\n"
                   << "idx: " << code_idx << "\n"
                   << "new code size: " << new_code_size << "\n"
-                  << "new code type: " << evmc::hex({scratch, 4}) << "\n"
-                  << evmc::hex(orig) << "\n"
+                  << "new code type: " << evmc::hex({scratch, 4})
+                  << "\n"
+                  // << evmc::hex(orig) << "\n"
                   << evmc::hex({data_, new_size}) << "\n";
         std::abort();
       }
@@ -187,9 +188,8 @@ public:
 
     const auto& header = std::get<evmone::EOF1Header>(header_or_err);
 
-    const auto total_count = header.code_sizes.size() +
-                             header.container_sizes.size() +
-                             (header.data_size != 0) + 1;
+    const auto total_count =
+        header.code_sizes.size() + header.container_sizes.size() + 1 + 2;
 
     const auto elem_idx = rand_() % total_count;
 
@@ -203,6 +203,7 @@ public:
     if (code_idx < header.code_sizes.size())
       return mutate_code(code_idx, header);
 
+    // TODO: Assign higher priority to subcontainers.
     const auto cont_idx = code_idx - header.code_sizes.size();
     if (cont_idx < header.container_sizes.size())
       return mutate_subcontainer(cont_idx, header);
