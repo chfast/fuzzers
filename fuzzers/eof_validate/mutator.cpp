@@ -27,10 +27,16 @@ class EOFMutator {
   size_t max_size_;
   std::minstd_rand rand_;
 
-  size_t mutate_types(const evmone::EOF1Header& header) {
+  evmone::EOF1Header hdr_;
+
+  size_t mutate_all() noexcept {
+    return LLVMFuzzerMutate(data_, size_, max_size_);
+  }
+
+  size_t mutate_types() {
     // Just mutate the type section in-place without changing its size.
     // TODO: Any better ideas?
-    const auto types = get_types(header, data_);
+    const auto types = get_types(hdr_, data_);
     LLVMFuzzerMutate(types.data(), types.size(), types.size());
     return size_;
   }
@@ -39,17 +45,17 @@ class EOFMutator {
   // TODO: Alternatives:
   // - mutate type and code section separately.
   // - mutate type in the context of the whole type section.
-  size_t mutate_code(size_t code_idx, const evmone::EOF1Header& header) {
+  size_t mutate_code(size_t code_idx) {
 
     // TODO: Remove when stable.
     // const evmc::bytes orig{data_, size_};
 
     uint8_t scratch[evmone::MAX_INITCODE_SIZE];
     const auto extra_size = max_size_ - size_;
-    const auto types = get_types(header, data_);
+    const auto types = get_types(hdr_, data_);
     const auto type_ptr = &types[code_idx * 4];
-    const size_t code_off = header.code_offsets[code_idx];
-    const size_t code_size = header.code_sizes[code_idx];
+    const size_t code_off = hdr_.code_offsets[code_idx];
+    const size_t code_size = hdr_.code_sizes[code_idx];
 
     std::memcpy(scratch, type_ptr, 4);
     std::memcpy(scratch + 4, data_ + code_off, code_size);
@@ -99,10 +105,9 @@ class EOFMutator {
     return new_size;
   }
 
-  size_t mutate_subcontainer(size_t cont_idx,
-                             const evmone::EOF1Header& header) {
+  size_t mutate_subcontainer(size_t cont_idx) {
     const evmone::bytes_view container{data_, size_};
-    const auto subcontainer = header.get_container(container, cont_idx);
+    const auto subcontainer = hdr_.get_container(container, cont_idx);
 
     uint8_t scratch[evmone::MAX_INITCODE_SIZE];
     const auto extra_size = max_size_ - size_;
@@ -123,7 +128,7 @@ class EOFMutator {
                 new_subcontainer_size);
 
     const auto container_size_off =
-        3 + 3 + 3 + 2 * header.code_sizes.size() + 3 + 2 * cont_idx;
+        3 + 3 + 3 + 2 * hdr_.code_sizes.size() + 3 + 2 * cont_idx;
     data_[container_size_off] = new_subcontainer_size >> 8;
     data_[container_size_off + 1] = new_subcontainer_size;
 
@@ -148,14 +153,14 @@ public:
   EOFMutator(uint8_t* data, size_t size, size_t max_size, uint32_t seed)
       : data_{data}, size_{size}, max_size_{max_size}, rand_{seed} {}
 
-  size_t mutate_data(const evmone::EOF1Header& header) {
-    const auto data = header.get_data({data_, size_});
+  size_t mutate_data() {
+    const auto data = hdr_.get_data({data_, size_});
     const auto extra_size = max_size_ - size_;
     const auto new_data_size =
         LLVMFuzzerMutate(const_cast<uint8_t*>(data.data()), data.size(),
                          data.size() + extra_size);
-    const auto data_size_off = 3 + 3 + 3 + 2 * header.code_sizes.size() + 3 +
-                               2 * header.container_sizes.size() + 3;
+    const auto data_size_off = 3 + 3 + 3 + 2 * hdr_.code_sizes.size() + 3 +
+                               2 * hdr_.container_sizes.size() + 3;
     data_[data_size_off] = new_data_size >> 8;
     data_[data_size_off + 1] = new_data_size;
 
@@ -178,7 +183,7 @@ public:
       }
     }
 
-    const auto header_or_err = evmone::validate_header(REV, container);
+    auto header_or_err = evmone::validate_header(REV, container);
     if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
       // TODO(evmone): validate_header also validates types.
       assert(get<evmone::EOFValidationError>(header_or_err) == err);
@@ -186,30 +191,32 @@ public:
       return LLVMFuzzerMutate(data_, size_, max_size_);
     }
 
-    const auto& header = std::get<evmone::EOF1Header>(header_or_err);
+    hdr_ = std::get<evmone::EOF1Header>(std::move(header_or_err));
+
+    using FFFF = size_t (EOFMutator::*)(const evmone::EOF1Header&);
 
     const auto total_count =
-        header.code_sizes.size() + header.container_sizes.size() + 1 + 2;
+        hdr_.code_sizes.size() + hdr_.container_sizes.size() + 1 + 2;
 
     const auto elem_idx = rand_() % total_count;
 
     if (elem_idx == total_count - 1) // special index, mutate whole container
-      return LLVMFuzzerMutate(data_, size_, max_size_);
+      return mutate_all();
 
     if (elem_idx == 0)
-      return mutate_types(header);
+      return mutate_types();
 
     const auto code_idx = elem_idx - 1;
-    if (code_idx < header.code_sizes.size())
-      return mutate_code(code_idx, header);
+    if (code_idx < hdr_.code_sizes.size())
+      return mutate_code(code_idx);
 
     // TODO: Assign higher priority to subcontainers.
-    const auto cont_idx = code_idx - header.code_sizes.size();
-    if (cont_idx < header.container_sizes.size())
-      return mutate_subcontainer(cont_idx, header);
+    const auto cont_idx = code_idx - hdr_.code_sizes.size();
+    if (cont_idx < hdr_.container_sizes.size())
+      return mutate_subcontainer(cont_idx);
 
     assert(elem_idx == total_count - 2);
-    return mutate_data(header);
+    return mutate_data();
   }
 };
 
