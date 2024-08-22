@@ -29,6 +29,26 @@ class EOFMutator {
 
   evmone::EOF1Header hdr_;
 
+  static constexpr auto PREFIX_SIZE = 3;
+  static constexpr auto SELECTOR_SIZE = 1;
+  static constexpr auto NUM_SIZE = 2;
+  void patch_types_size(uint16_t x) noexcept {
+    const auto p = &data_[PREFIX_SIZE + SELECTOR_SIZE];
+    p[0] = x >> 8;
+    p[1] = x & 0xff;
+  }
+  void patch_codes_count(uint16_t x) noexcept {
+    const auto p =
+        &data_[PREFIX_SIZE + SELECTOR_SIZE + NUM_SIZE + SELECTOR_SIZE];
+    p[0] = x >> 8;
+    p[1] = x & 0xff;
+  }
+  void patch_code_size(size_t idx, uint16_t x) noexcept {
+    const auto code_size_off = 3 + 3 + 3 + 2 * idx;
+    data_[code_size_off] = x >> 8;
+    data_[code_size_off + 1] = x;
+  }
+
   size_t mutate_all() noexcept {
     return LLVMFuzzerMutate(data_, size_, max_size_);
   }
@@ -54,6 +74,47 @@ class EOFMutator {
 
     const auto size_diff = new_data_size - data.size();
     return size_ + size_diff;
+  }
+
+  size_t add_code() noexcept {
+    // TODO: Maybe better strategy is duplicating existing code?
+    // TODO: Drop CALLF/JUMPF to this code section in some other code?
+    const auto extra_size = max_size_ - size_;
+    if (extra_size < 2 + 4 + 1) {
+      // This happens from time to time, but it doesn't seem to be a problem
+      // if we return unmodified.
+      return size_; // No change. TODO: does 0 indicates anything?
+    }
+
+    const auto cnt = hdr_.code_sizes.size();
+    patch_types_size((cnt + 1) * 4);
+    patch_codes_count(cnt + 1);
+
+    auto data_end = data_ + size_;
+    const auto codes_sizes_end =
+        &data_[PREFIX_SIZE + SELECTOR_SIZE + NUM_SIZE + SELECTOR_SIZE +
+               NUM_SIZE + cnt * NUM_SIZE];
+    std::memmove(codes_sizes_end + NUM_SIZE, codes_sizes_end,
+                 data_end - codes_sizes_end);
+    data_end += NUM_SIZE;
+    patch_code_size(cnt, 1);
+
+    const auto new_type = &data_[hdr_.code_offsets.front() + NUM_SIZE];
+    std::memmove(new_type + 4, new_type, data_end - new_type);
+    data_end += 4;
+    new_type[0] = 0;
+    new_type[1] = 0x80;
+    new_type[2] = 0;
+    new_type[3] = 0;
+
+    const auto new_code = &data_[hdr_.code_offsets.back() +
+                                 hdr_.code_sizes.back() + NUM_SIZE + 4];
+    std::memmove(new_code + 1, new_code, data_end - new_code);
+    data_end += 1;
+    new_code[0] = 0xFE;
+
+    // TODO: Validate.
+    return data_end - data_;
   }
 
   // Mutate code section together with its type.
@@ -96,9 +157,7 @@ class EOFMutator {
     const auto new_size = size_ + (new_code_size - code_size);
 
     // Patch size in header.
-    const auto code_size_off = 3 + 3 + 3 + 2 * code_idx;
-    data_[code_size_off] = new_code_size >> 8;
-    data_[code_size_off + 1] = new_code_size;
+    patch_code_size(code_idx, new_code_size);
 
     // Validate.
     const auto header_or_err = evmone::validate_header(REV, {data_, new_size});
@@ -197,6 +256,7 @@ public:
         &EOFMutator::mutate_all,
         &EOFMutator::mutate_types,
         &EOFMutator::mutate_data,
+        &EOFMutator::add_code,
     };
 
     const auto sample_size = SINGLETON_MUTATIONS.size() +
