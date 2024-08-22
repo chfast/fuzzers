@@ -280,7 +280,7 @@ public:
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
                                           size_t max_size, unsigned seed) {
-
+  // TODO: Add custom CrossOver.
   return fzz::EOFMutator{data, size, max_size, seed}.mutate();
   // return fzz::mutate_container(data_ptr, data_size, data_max_size, seed);
 }

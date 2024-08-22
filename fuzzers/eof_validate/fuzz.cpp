@@ -8,6 +8,9 @@ using namespace evmone;
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
                                       size_t data_size) noexcept {
+  // TODO: Add option to disable external projects, e.g. -besu=0.
+  // TODO: Compare error categories.
+
   using namespace fzz;
 
   // FIXME: Fix evmone API to properly handle inputs above the limit.
