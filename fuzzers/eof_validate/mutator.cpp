@@ -33,7 +33,7 @@ class EOFMutator {
     return LLVMFuzzerMutate(data_, size_, max_size_);
   }
 
-  size_t mutate_types() {
+  size_t mutate_types() noexcept {
     // Just mutate the type section in-place without changing its size.
     // TODO: Any better ideas?
     const auto types = get_types(hdr_, data_);
@@ -41,11 +41,26 @@ class EOFMutator {
     return size_;
   }
 
+  size_t mutate_data() noexcept {
+    const auto data = hdr_.get_data({data_, size_});
+    const auto extra_size = max_size_ - size_;
+    const auto new_data_size =
+        LLVMFuzzerMutate(const_cast<uint8_t*>(data.data()), data.size(),
+                         data.size() + extra_size);
+    const auto data_size_off = 3 + 3 + 3 + 2 * hdr_.code_sizes.size() + 3 +
+                               2 * hdr_.container_sizes.size() + 3;
+    data_[data_size_off] = new_data_size >> 8;
+    data_[data_size_off + 1] = new_data_size;
+
+    const auto size_diff = new_data_size - data.size();
+    return size_ + size_diff;
+  }
+
   // Mutate code section together with its type.
   // TODO: Alternatives:
   // - mutate type and code section separately.
   // - mutate type in the context of the whole type section.
-  size_t mutate_code(size_t code_idx) {
+  size_t mutate_code(size_t code_idx) noexcept {
 
     // TODO: Remove when stable.
     // const evmc::bytes orig{data_, size_};
@@ -105,7 +120,7 @@ class EOFMutator {
     return new_size;
   }
 
-  size_t mutate_subcontainer(size_t cont_idx) {
+  size_t mutate_subcontainer(size_t cont_idx) noexcept {
     const evmone::bytes_view container{data_, size_};
     const auto subcontainer = hdr_.get_container(container, cont_idx);
 
@@ -153,21 +168,6 @@ public:
   EOFMutator(uint8_t* data, size_t size, size_t max_size, uint32_t seed)
       : data_{data}, size_{size}, max_size_{max_size}, rand_{seed} {}
 
-  size_t mutate_data() {
-    const auto data = hdr_.get_data({data_, size_});
-    const auto extra_size = max_size_ - size_;
-    const auto new_data_size =
-        LLVMFuzzerMutate(const_cast<uint8_t*>(data.data()), data.size(),
-                         data.size() + extra_size);
-    const auto data_size_off = 3 + 3 + 3 + 2 * hdr_.code_sizes.size() + 3 +
-                               2 * hdr_.container_sizes.size() + 3;
-    data_[data_size_off] = new_data_size >> 8;
-    data_[data_size_off + 1] = new_data_size;
-
-    const auto size_diff = new_data_size - data.size();
-    return size_ + size_diff;
-  }
-
   size_t mutate() {
     evmone::bytes_view container{data_, size_};
 
@@ -193,30 +193,25 @@ public:
 
     hdr_ = std::get<evmone::EOF1Header>(std::move(header_or_err));
 
-    using FFFF = size_t (EOFMutator::*)(const evmone::EOF1Header&);
+    static constexpr std::array SINGLETON_MUTATIONS{
+        &EOFMutator::mutate_all,
+        &EOFMutator::mutate_types,
+        &EOFMutator::mutate_data,
+    };
 
-    const auto total_count =
-        hdr_.code_sizes.size() + hdr_.container_sizes.size() + 1 + 2;
-
-    const auto elem_idx = rand_() % total_count;
-
-    if (elem_idx == total_count - 1) // special index, mutate whole container
-      return mutate_all();
-
-    if (elem_idx == 0)
-      return mutate_types();
-
-    const auto code_idx = elem_idx - 1;
-    if (code_idx < hdr_.code_sizes.size())
-      return mutate_code(code_idx);
-
+    const auto sample_size = SINGLETON_MUTATIONS.size() +
+                             hdr_.code_sizes.size() +
+                             hdr_.container_sizes.size();
+    auto sample = rand_() % sample_size;
+    if (sample < SINGLETON_MUTATIONS.size())
+      return (this->*SINGLETON_MUTATIONS[sample])();
+    sample -= SINGLETON_MUTATIONS.size();
+    if (sample < hdr_.code_sizes.size())
+      return mutate_code(sample);
+    sample -= hdr_.code_sizes.size();
+    assert(sample < hdr_.container_sizes.size());
     // TODO: Assign higher priority to subcontainers.
-    const auto cont_idx = code_idx - hdr_.code_sizes.size();
-    if (cont_idx < hdr_.container_sizes.size())
-      return mutate_subcontainer(cont_idx);
-
-    assert(elem_idx == total_count - 2);
-    return mutate_data();
+    return mutate_subcontainer(sample);
   }
 };
 
