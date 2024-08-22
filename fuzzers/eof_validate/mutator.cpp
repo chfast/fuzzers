@@ -43,10 +43,14 @@ class EOFMutator {
     p[0] = x >> 8;
     p[1] = x & 0xff;
   }
-  void patch_code_size(size_t idx, uint16_t x) noexcept {
+  uint8_t* get_code_size_ptr(size_t idx) noexcept {
     const auto code_size_off = 3 + 3 + 3 + 2 * idx;
-    data_[code_size_off] = x >> 8;
-    data_[code_size_off + 1] = x;
+    return data_ + code_size_off;
+  }
+  void patch_code_size(size_t idx, uint16_t x) noexcept {
+    const auto p = get_code_size_ptr(idx);
+    p[0] = x >> 8;
+    p[1] = x;
   }
 
   size_t mutate_all() noexcept {
@@ -112,6 +116,32 @@ class EOFMutator {
     std::memmove(new_code + 1, new_code, data_end - new_code);
     data_end += 1;
     new_code[0] = 0xFE;
+
+    // TODO: Validate.
+    return data_end - data_;
+  }
+
+  size_t remove_code() noexcept {
+    const auto cnt = hdr_.code_sizes.size();
+    const auto idx = rand_() % cnt;
+
+    patch_types_size((cnt - 1) * 4);
+    patch_codes_count(cnt - 1);
+
+    auto data_end = data_ + size_;
+    const auto code_size_p = get_code_size_ptr(idx);
+    data_end -= NUM_SIZE;
+    std::memmove(code_size_p, code_size_p + NUM_SIZE, data_end - code_size_p);
+
+    const auto types = get_types(hdr_, data_);
+    const auto type_ptr = &types[idx * 4] - NUM_SIZE;
+    data_end -= 4;
+    std::memmove(type_ptr, type_ptr + 4, data_end - type_ptr);
+
+    const auto code = &data_[hdr_.code_offsets[idx]] - NUM_SIZE - 4;
+    const auto code_size = hdr_.code_sizes[idx];
+    data_end -= code_size;
+    std::memmove(code, code + code_size, data_end - code);
 
     // TODO: Validate.
     return data_end - data_;
@@ -253,10 +283,9 @@ public:
     hdr_ = std::get<evmone::EOF1Header>(std::move(header_or_err));
 
     static constexpr std::array SINGLETON_MUTATIONS{
-        &EOFMutator::mutate_all,
-        &EOFMutator::mutate_types,
-        &EOFMutator::mutate_data,
-        &EOFMutator::add_code,
+        &EOFMutator::mutate_all,  &EOFMutator::mutate_types,
+        &EOFMutator::mutate_data, &EOFMutator::add_code,
+        &EOFMutator::remove_code,
     };
 
     const auto sample_size = SINGLETON_MUTATIONS.size() +
