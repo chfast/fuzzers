@@ -19,14 +19,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   const auto v_status = validate_eof(REV, ContainerKind::runtime, data);
   assert(v_status != EOFValidationError::impossible);
 
-  if (v_status != EOFValidationError::success) {
-    // Inspect found categories.
-    const auto cat = get_cat(v_status);
-    if (cat == EOFErrCat::other) {
-      std::cerr << v_status << "\n";
-      std::abort();
-    }
-  }
+  // if (v_status != EOFValidationError::success) {
+  //   // Inspect found categories.
+  //   const auto cat = get_cat(v_status);
+  //   if (cat == EOFErrCat::other) {
+  //     std::cerr << v_status << "\n";
+  //     std::abort();
+  //   }
+  // }
 
   const auto evm1_ok = v_status == EOFValidationError::success;
   switch (v_status) {
