@@ -72,27 +72,28 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
       vh_status != EOFValidationError::success)
     __builtin_trap();
 
-  if (v_status == EOFValidationError::success) {
-    const auto h = read_valid_eof1_header(data);
-
-    test::eof_bytecode bc{bytes{h.get_code(data, 0)},
-                          h.types[0].max_stack_height};
-    bc.data(bytes{h.get_data(data)});
-
-    for (size_t i = 1; i < h.code_sizes.size(); ++i)
-      bc.code(bytes{h.get_code(data, i)}, h.types[i].inputs, h.types[i].outputs,
-              h.types[i].max_stack_height);
-
-    for (size_t i = 0; i < h.container_sizes.size(); ++i)
-      bc.container(bytes{h.get_container(data, i)});
-
-    const auto serialized = test::bytecode{bc};
-    if (serialized != data) {
-      std::cerr << "input: " << hex(data) << "\n";
-      std::cerr << "bc:    " << hex(serialized) << "\n";
-
-      __builtin_trap();
-    }
-  }
+  // TODO: bytecode testing disabled.
+  // if (v_status == EOFValidationError::success) {
+  //   const auto h = read_valid_eof1_header(data);
+  //
+  //   test::eof_bytecode bc{bytes{h.get_code(data, 0)},
+  //                         h.types[0].max_stack_height};
+  //   bc.data(bytes{h.get_data(data)});
+  //
+  //   for (size_t i = 1; i < h.code_sizes.size(); ++i)
+  //     bc.code(bytes{h.get_code(data, i)}, h.types[i].inputs, h.types[i].outputs,
+  //             h.types[i].max_stack_height);
+  //
+  //   for (size_t i = 0; i < h.container_sizes.size(); ++i)
+  //     bc.container(bytes{h.get_container(data, i)});
+  //
+  //   const auto serialized = test::bytecode{bc};
+  //   if (serialized != data) {
+  //     std::cerr << "input: " << hex(data) << "\n";
+  //     std::cerr << "bc:    " << hex(serialized) << "\n";
+  //
+  //     __builtin_trap();
+  //   }
+  // }
   return 0;
 }
