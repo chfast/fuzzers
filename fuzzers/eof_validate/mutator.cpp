@@ -1,5 +1,6 @@
 #include "eof_validate.hpp"
 #include "evmone/constants.hpp"
+#include <evmone/instructions_opcodes.hpp>
 
 #include <evmc/hex.hpp>
 #include <intx/intx.hpp>
@@ -32,6 +33,11 @@ class EOFMutator {
   static constexpr auto PREFIX_SIZE = 3;
   static constexpr auto SELECTOR_SIZE = 1;
   static constexpr auto NUM_SIZE = 2;
+
+  static inline const auto MINIMAL_EOF =
+      evmc::from_spaced_hex("ef0001 010004 0200010001 040000 00 008000 fe")
+          .value();
+
   void patch_types_size(uint16_t x) noexcept {
     const auto p = &data_[PREFIX_SIZE + SELECTOR_SIZE];
     p[0] = x >> 8;
@@ -51,6 +57,22 @@ class EOFMutator {
     const auto p = get_code_size_ptr(idx);
     p[0] = x >> 8;
     p[1] = x;
+  }
+  void patch_subcontainers_count(uint16_t x) noexcept {
+    const auto p =
+        &data_[PREFIX_SIZE + SELECTOR_SIZE + NUM_SIZE + SELECTOR_SIZE];
+    p[0] = x >> 8;
+    p[1] = x & 0xff;
+  }
+  uint8_t* get_subcontainer_size_ptr(size_t idx) noexcept {
+    const auto container_size_off =
+        3 + 3 + 3 + 2 * hdr_.code_sizes.size() + 3 + 2 * idx;
+    return &data_[container_size_off];
+  }
+  void patch_subcontainer_size(size_t idx, uint16_t x) noexcept {
+    const auto p = get_subcontainer_size_ptr(idx);
+    p[0] = x >> 8;
+    p[1] = x & 0xff;
   }
 
   size_t mutate_all() noexcept {
@@ -115,10 +137,18 @@ class EOFMutator {
                                  hdr_.code_sizes.back() + NUM_SIZE + 4];
     std::memmove(new_code + 1, new_code, data_end - new_code);
     data_end += 1;
+    // TODO: Inject code with RETF: then every type [x,x,x] is valid.
     new_code[0] = 0xFE;
 
     // TODO: Validate.
-    return data_end - data_;
+    const auto new_size = data_end - data_;
+    if (new_size > evmone::MAX_INITCODE_SIZE) {
+      std::cerr << "NCODEold:" << size_ << "\nnew:" << new_size << " "
+                << MINIMAL_EOF.size();
+      std::abort();
+    }
+    assert(new_size <= evmone::MAX_INITCODE_SIZE);
+    return new_size;
   }
 
   size_t remove_code() noexcept {
@@ -147,6 +177,42 @@ class EOFMutator {
     return data_end - data_;
   }
 
+  size_t add_subcontainer() noexcept {
+    if (hdr_.container_sizes.empty()) {
+      // If not subcontainers, there is no 03 section.
+      // Let fuzzer figure out how to add at least one.
+      return size_;
+    }
+
+    const auto extra_size = max_size_ - size_;
+    if (extra_size < MINIMAL_EOF.size() + NUM_SIZE) {
+      return size_;
+    }
+
+    const auto cnt = hdr_.container_sizes.size();
+    patch_subcontainers_count(cnt + 1);
+
+    auto data_end = data_ + size_;
+    const auto cont_size_p = get_subcontainer_size_ptr(cnt);
+    std::memmove(cont_size_p + NUM_SIZE, cont_size_p, data_end - cont_size_p);
+    data_end += NUM_SIZE;
+    patch_subcontainer_size(cnt, MINIMAL_EOF.size());
+
+    const auto new_cont = &data_[hdr_.data_offset + NUM_SIZE];
+    std::memmove(new_cont + MINIMAL_EOF.size(), new_cont, data_end - new_cont);
+    data_end += MINIMAL_EOF.size();
+    std::memcpy(new_cont, MINIMAL_EOF.data(), MINIMAL_EOF.size());
+
+    // TODO: Validate.
+    const auto new_size = data_end - data_;
+    if (new_size > evmone::MAX_INITCODE_SIZE) {
+      std::cerr << "old:" << size_ << "\nnew:" << new_size << " "
+                << MINIMAL_EOF.size();
+      std::abort();
+    }
+    assert(new_size <= evmone::MAX_INITCODE_SIZE);
+    return new_size;
+  }
   // Mutate code section together with its type.
   // TODO: Alternatives:
   // - mutate type and code section separately.
@@ -231,10 +297,7 @@ class EOFMutator {
     std::memcpy(const_cast<uint8_t*>(subcontainer.data()), scratch,
                 new_subcontainer_size);
 
-    const auto container_size_off =
-        3 + 3 + 3 + 2 * hdr_.code_sizes.size() + 3 + 2 * cont_idx;
-    data_[container_size_off] = new_subcontainer_size >> 8;
-    data_[container_size_off + 1] = new_subcontainer_size;
+    patch_subcontainer_size(cont_idx, new_subcontainer_size);
 
     const auto new_size = size_ + size_diff;
 
@@ -253,12 +316,46 @@ class EOFMutator {
     return new_size;
   }
 
+  size_t inject_instruction() noexcept {
+    static constexpr std::array INSTRUCTIONS{evmone::OP_JUMPF,
+                                             evmone::OP_CALLF};
+
+    const auto instr = INSTRUCTIONS[rand_() % INSTRUCTIONS.size()];
+
+    switch (instr) {
+    case evmone::OP_CALLF:
+    case evmone::OP_JUMPF: {
+      static constexpr size_t req_size = 3;
+      const auto start_idx = rand_() % hdr_.code_sizes.size();
+      const auto target_idx = rand_() % hdr_.code_sizes.size();
+      const auto code = hdr_.get_code({data_, size_}, start_idx);
+      if (code.size() < req_size)
+        break;
+      const auto pos = rand_() % (code.size() - req_size + 1);
+      const auto p = const_cast<uint8_t*>(&code[pos]);
+      p[0] = static_cast<uint8_t>(instr);
+      p[1] = target_idx >> 8;
+      p[2] = target_idx;
+      break;
+    }
+    default:
+      __builtin_trap();
+    }
+    return size_;
+  }
+
 public:
   EOFMutator(uint8_t* data, size_t size, size_t max_size, uint32_t seed)
       : data_{data}, size_{size}, max_size_{max_size}, rand_{seed} {}
 
   size_t mutate() {
+    if (size_ > evmone::MAX_INITCODE_SIZE) {
+      // TODO: Not sure why it happens.
+      return size_;
+    }
+
     evmone::bytes_view container{data_, size_};
+    assert(container.size() <= evmone::MAX_INITCODE_SIZE);
 
     const auto err =
         evmone::validate_eof(REV, evmone::ContainerKind::runtime, container);
@@ -272,6 +369,7 @@ public:
       }
     }
 
+    assert(container.size() <= evmone::MAX_INITCODE_SIZE);
     auto header_or_err = evmone::validate_header(REV, container);
     if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
       // TODO(evmone): validate_header also validates types.
@@ -283,9 +381,10 @@ public:
     hdr_ = std::get<evmone::EOF1Header>(std::move(header_or_err));
 
     static constexpr std::array SINGLETON_MUTATIONS{
-        &EOFMutator::mutate_all,  &EOFMutator::mutate_types,
-        &EOFMutator::mutate_data, &EOFMutator::add_code,
-        &EOFMutator::remove_code,
+        &EOFMutator::mutate_all,         &EOFMutator::mutate_types,
+        &EOFMutator::mutate_data,        &EOFMutator::add_code,
+        &EOFMutator::remove_code,        &EOFMutator::add_subcontainer,
+        &EOFMutator::inject_instruction,
     };
 
     const auto sample_size = SINGLETON_MUTATIONS.size() +
