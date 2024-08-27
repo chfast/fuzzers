@@ -246,6 +246,52 @@ class EOFMutator {
     assert(new_size <= evmone::MAX_INITCODE_SIZE);
     return new_size;
   }
+
+  size_t remove_subcontainer() noexcept {
+    const auto cnt = hdr_.container_sizes.size();
+    if (cnt == 0)
+      return size_;
+    const auto idx = rand_() % cnt;
+
+    evmc::bytes old{data_, size_};
+
+    patch_subcontainers_count(cnt - 1);
+
+    auto data_end = data_ + size_;
+    const auto cont_size_p = get_subcontainer_size_ptr(idx);
+    data_end -= NUM_SIZE;
+    std::memmove(cont_size_p, cont_size_p + NUM_SIZE, data_end - cont_size_p);
+
+    const auto cont = &data_[hdr_.container_offsets[idx]] - NUM_SIZE;
+    const auto cont_size = hdr_.container_sizes[idx];
+    data_end -= cont_size;
+    std::memmove(cont, cont + cont_size, data_end - cont);
+
+    // Validate.
+    const auto new_size = static_cast<size_t>(data_end - data_);
+    const auto hdr_err = evmone::validate_header(REV, {data_, new_size});
+    if (std::holds_alternative<evmone::EOFValidationError>(hdr_err)) {
+      const auto err = std::get<evmone::EOFValidationError>(hdr_err);
+      if (err == evmone::EOFValidationError::zero_section_size && cnt == 1)
+        return size_; // TODO: For cnt==1 we want to remove whole 03 section.
+      std::cerr << err << ' ' << idx << '\n'
+                << evmc::hex({data_, new_size}) << '\n'
+                << evmc::hex(old) << '\n';
+      std::abort();
+    }
+
+    /*
+    ef0001 010004 0200010001 0300020001 0400040000800000017e
+    ef0001 010004 0200010001 0300020001 0001 0400040000800000017e00
+
+     */
+
+    assert(std::holds_alternative<evmone::EOF1Header>(hdr_err));
+    const auto& new_hdr = std::get<evmone::EOF1Header>(hdr_err);
+    assert(new_hdr.container_sizes.size() == hdr_.container_sizes.size() - 1);
+    return new_size;
+  }
+
   // Mutate code section together with its type.
   // TODO: Alternatives:
   // - mutate type and code section separately.
@@ -422,7 +468,7 @@ public:
         &EOFMutator::mutate_all,         &EOFMutator::mutate_types,
         &EOFMutator::mutate_data,        &EOFMutator::add_code,
         &EOFMutator::remove_code,        &EOFMutator::add_subcontainer,
-        &EOFMutator::inject_instruction,
+        &EOFMutator::inject_instruction, &EOFMutator::remove_subcontainer,
     };
 
     const auto sample_size = SINGLETON_MUTATIONS.size() +
