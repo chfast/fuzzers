@@ -401,10 +401,8 @@ class EOFMutator {
 
   size_t inject_instruction() noexcept {
     static constexpr std::array INSTRUCTIONS{
-        evmone::OP_JUMPF,
-        evmone::OP_CALLF,
-        evmone::OP_RJUMP,
-        evmone::OP_RJUMPI,
+        evmone::OP_JUMPF,  evmone::OP_CALLF,     evmone::OP_RJUMP,
+        evmone::OP_RJUMPI, evmone::OP_EOFCREATE, evmone::OP_RETURNCONTRACT,
     };
 
     const auto instr = INSTRUCTIONS[rand_() % INSTRUCTIONS.size()];
@@ -441,6 +439,20 @@ class EOFMutator {
       p[0] = static_cast<uint8_t>(instr);
       p[1] = imm >> 8;
       p[2] = imm;
+      break;
+    }
+    case evmone::OP_EOFCREATE:
+    case evmone::OP_RETURNCONTRACT: {
+      static constexpr size_t req_size = 2;
+      const auto start_idx = rand_() % hdr_.code_sizes.size();
+      const auto code = hdr_.get_code({data_, size_}, start_idx);
+      if (code.size() < req_size)
+        break;
+      const auto pos = rand_() % (code.size() - req_size + 1);
+      const auto p = const_cast<uint8_t*>(&code[pos]);
+      const auto tgt = rand_() % (hdr_.container_sizes.size() + 1);
+      p[0] = static_cast<uint8_t>(instr);
+      p[1] = tgt;
       break;
     }
     default:
