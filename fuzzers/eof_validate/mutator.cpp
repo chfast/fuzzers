@@ -168,6 +168,7 @@ class EOFMutator {
 
   size_t remove_code() noexcept {
     const auto cnt = hdr_.code_sizes.size();
+    assert(cnt > 0);
     const auto idx = rand_() % cnt;
 
     patch_types_size((cnt - 1) * 4);
@@ -188,8 +189,24 @@ class EOFMutator {
     data_end -= code_size;
     std::memmove(code, code + code_size, data_end - code);
 
-    // TODO: Validate.
-    return data_end - data_;
+    // Validate.
+    const auto new_size = static_cast<size_t>(data_end - data_);
+    const auto hdr_err = evmone::validate_header(REV, {data_, new_size});
+    if (std::holds_alternative<evmone::EOFValidationError>(hdr_err)) {
+      const auto err = std::get<evmone::EOFValidationError>(hdr_err);
+      if (err == evmone::EOFValidationError::zero_section_size && cnt == 1)
+        return size_;
+      if (err == evmone::EOFValidationError::invalid_first_section_type &&
+          idx == 0)
+        return size_;
+      std::cerr << err << '\n';
+      std::abort();
+    }
+
+    assert(std::holds_alternative<evmone::EOF1Header>(hdr_err));
+    const auto& new_hdr = std::get<evmone::EOF1Header>(hdr_err);
+    assert(new_hdr.code_sizes.size() == hdr_.code_sizes.size() - 1);
+    return new_size;
   }
 
   size_t add_subcontainer() noexcept {
