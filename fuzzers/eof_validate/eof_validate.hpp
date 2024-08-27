@@ -50,10 +50,10 @@ inline EOFErrCat get_cat(evmone::EOFValidationError err) noexcept {
     return EOFErrCat::code;
   case unreferenced_subcontainer:
   case eofcreate_with_truncated_container:
+  case ambiguous_container_kind:
     return EOFErrCat::subcont;
   case unreachable_code_sections:
     return EOFErrCat::ref;
-  case ambiguous_container_kind:
   case container_size_above_limit:
     return EOFErrCat::other;
   case success:

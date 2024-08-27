@@ -399,10 +399,19 @@ class EOFMutator {
     return new_size;
   }
 
+  uint16_t gen_rjump_imm(size_t src, size_t size) noexcept {
+    // valid range for jump offsets is [0, size-1]-src,
+    // so let's add +1 on both sides.
+    const auto tgt = rand_() % (size + 2) + 1;
+    const auto imm = static_cast<uint16_t>(tgt - src);
+    return imm;
+  }
+
   size_t inject_instruction() noexcept {
     static constexpr std::array INSTRUCTIONS{
-        evmone::OP_JUMPF,  evmone::OP_CALLF,     evmone::OP_RJUMP,
-        evmone::OP_RJUMPI, evmone::OP_EOFCREATE, evmone::OP_RETURNCONTRACT,
+        evmone::OP_JUMPF,          evmone::OP_CALLF,  evmone::OP_RJUMP,
+        evmone::OP_RJUMPI,         evmone::OP_RJUMPV, evmone::OP_EOFCREATE,
+        evmone::OP_RETURNCONTRACT,
     };
 
     const auto instr = INSTRUCTIONS[rand_() % INSTRUCTIONS.size()];
@@ -432,13 +441,34 @@ class EOFMutator {
         break;
       const auto pos = rand_() % (code.size() - req_size + 1);
       const auto p = const_cast<uint8_t*>(&code[pos]);
-      // valid range for jump offsets is [-3, size-4]-pos, so let's add +1 on
-      // both sides.
-      const auto tgt = rand_() % (code.size() + 2);
-      const auto imm = static_cast<uint16_t>(tgt - 3 - pos);
+      const auto imm = gen_rjump_imm(pos + 3, code.size());
       p[0] = static_cast<uint8_t>(instr);
       p[1] = imm >> 8;
       p[2] = imm;
+      break;
+    }
+    case evmone::OP_RJUMPV: {
+      static constexpr size_t req_size = 4;
+      const auto start_idx = rand_() % hdr_.code_sizes.size();
+      const auto code = hdr_.get_code({data_, size_}, start_idx);
+      const auto size = code.size();
+      if (size < req_size)
+        break;
+      const auto pos = rand_() % (size - req_size + 1);
+      const auto max_cnt = (size - (pos + req_size)) / NUM_SIZE;
+      const auto cnt = rand_() % (max_cnt + 1);
+      const auto src = pos + req_size + cnt * NUM_SIZE;
+      const auto fallback_imm = gen_rjump_imm(src, size);
+      auto p = const_cast<uint8_t*>(&code[pos]);
+      *p++ = static_cast<uint8_t>(instr);
+      *p++ = cnt;
+      *p++ = fallback_imm >> 8;
+      *p++ = fallback_imm;
+      for (size_t i = 0; i < cnt; ++i) {
+        const auto imm = gen_rjump_imm(src, size);
+        *p++ = imm >> 8;
+        *p++ = imm;
+      }
       break;
     }
     case evmone::OP_EOFCREATE:
