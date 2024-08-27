@@ -60,7 +60,8 @@ class EOFMutator {
   }
   void patch_subcontainers_count(uint16_t x) noexcept {
     const auto p =
-        &data_[PREFIX_SIZE + SELECTOR_SIZE + NUM_SIZE + SELECTOR_SIZE];
+        &data_[PREFIX_SIZE + SELECTOR_SIZE + NUM_SIZE + SELECTOR_SIZE +
+               NUM_SIZE + NUM_SIZE * hdr_.code_sizes.size() + SELECTOR_SIZE];
     p[0] = x >> 8;
     p[1] = x & 0xff;
   }
