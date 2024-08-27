@@ -90,9 +90,13 @@ class EOFMutator {
   size_t mutate_data() noexcept {
     const auto data = hdr_.get_data({data_, size_});
     const auto extra_size = max_size_ - size_;
+    const auto max_data_size = data.size() + extra_size;
+    if (max_data_size == 0)
+      return size_;
     const auto new_data_size =
+        // FIXME: LLVMFuzzerMutate works incorrectly with max_size 0. Wrap it.
         LLVMFuzzerMutate(const_cast<uint8_t*>(data.data()), data.size(),
-                         data.size() + extra_size);
+                         max_data_size);
     const auto data_size_off = 3 + 3 + 3 + 2 * hdr_.code_sizes.size() + 3 +
                                2 * hdr_.container_sizes.size() + 3;
     data_[data_size_off] = new_data_size >> 8;
