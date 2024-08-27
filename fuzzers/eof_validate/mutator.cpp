@@ -400,8 +400,12 @@ class EOFMutator {
   }
 
   size_t inject_instruction() noexcept {
-    static constexpr std::array INSTRUCTIONS{evmone::OP_JUMPF,
-                                             evmone::OP_CALLF};
+    static constexpr std::array INSTRUCTIONS{
+        evmone::OP_JUMPF,
+        evmone::OP_CALLF,
+        evmone::OP_RJUMP,
+        evmone::OP_RJUMPI,
+    };
 
     const auto instr = INSTRUCTIONS[rand_() % INSTRUCTIONS.size()];
 
@@ -419,6 +423,24 @@ class EOFMutator {
       p[0] = static_cast<uint8_t>(instr);
       p[1] = target_idx >> 8;
       p[2] = target_idx;
+      break;
+    }
+    case evmone::OP_RJUMP:
+    case evmone::OP_RJUMPI: {
+      static constexpr size_t req_size = 3;
+      const auto start_idx = rand_() % hdr_.code_sizes.size();
+      const auto code = hdr_.get_code({data_, size_}, start_idx);
+      if (code.size() < req_size)
+        break;
+      const auto pos = rand_() % (code.size() - req_size + 1);
+      const auto p = const_cast<uint8_t*>(&code[pos]);
+      // valid range for jump offsets is [-3, size-4]-pos, so let's add +1 on
+      // both sides.
+      const auto tgt = rand_() % (code.size() + 2);
+      const auto imm = static_cast<uint16_t>(tgt - 3 - pos);
+      p[0] = static_cast<uint8_t>(instr);
+      p[1] = imm >> 8;
+      p[2] = imm;
       break;
     }
     default:
