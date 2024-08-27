@@ -256,6 +256,8 @@ class EOFMutator {
     patch_code_size(code_idx, new_code_size);
 
     // Validate.
+    assert(new_size <= evmone::MAX_INITCODE_SIZE);
+    assert(new_size <= max_size_);
     const auto header_or_err = evmone::validate_header(REV, {data_, new_size});
     if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
       const auto err = get<evmone::EOFValidationError>(header_or_err);
@@ -302,6 +304,8 @@ class EOFMutator {
     const auto new_size = size_ + size_diff;
 
     // Validate.
+    assert(new_size <= evmone::MAX_INITCODE_SIZE);
+    assert(new_size <= max_size_);
     const auto header_or_err = evmone::validate_header(REV, {data_, new_size});
     if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
       const auto err = get<evmone::EOFValidationError>(header_or_err);
@@ -370,6 +374,7 @@ public:
     }
 
     assert(container.size() <= evmone::MAX_INITCODE_SIZE);
+    assert(container.size() <= max_size_);
     auto header_or_err = evmone::validate_header(REV, container);
     if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
       // TODO(evmone): validate_header also validates types.
@@ -391,8 +396,11 @@ public:
                              hdr_.code_sizes.size() +
                              hdr_.container_sizes.size();
     auto sample = rand_() % sample_size;
-    if (sample < SINGLETON_MUTATIONS.size())
-      return (this->*SINGLETON_MUTATIONS[sample])();
+    if (sample < SINGLETON_MUTATIONS.size()) {
+      const auto new_size = (this->*SINGLETON_MUTATIONS[sample])();
+      assert(new_size <= evmone::MAX_INITCODE_SIZE);
+      return new_size;
+    }
     sample -= SINGLETON_MUTATIONS.size();
     if (sample < hdr_.code_sizes.size())
       return mutate_code(sample);
@@ -409,6 +417,8 @@ public:
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
                                           size_t max_size, unsigned seed) {
   // TODO: Add custom CrossOver.
-  return fzz::EOFMutator{data, size, max_size, seed}.mutate();
+  const auto new_size = fzz::EOFMutator{data, size, max_size, seed}.mutate();
+  assert(new_size <= evmone::MAX_INITCODE_SIZE);
+  return new_size;
   // return fzz::mutate_container(data_ptr, data_size, data_max_size, seed);
 }
