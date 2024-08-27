@@ -132,17 +132,28 @@ class EOFMutator {
     const auto new_type = &data_[hdr_.code_offsets.front() + NUM_SIZE];
     std::memmove(new_type + 4, new_type, data_end - new_type);
     data_end += 4;
-    new_type[0] = 0;
-    new_type[1] = 0x80;
-    new_type[2] = 0;
-    new_type[3] = 0;
+
+    const auto t = static_cast<uint8_t>(rand_());
+    const auto nonreturning = t >= 0x80;
+
+    if (nonreturning) {
+      new_type[0] = 0;
+      new_type[1] = 0x80;
+      new_type[2] = 0;
+      new_type[3] = 0;
+    } else {
+      new_type[0] = t;
+      new_type[1] = t;
+      new_type[2] = 0;
+      new_type[3] = t;
+    }
 
     const auto new_code = &data_[hdr_.code_offsets.back() +
                                  hdr_.code_sizes.back() + NUM_SIZE + 4];
     std::memmove(new_code + 1, new_code, data_end - new_code);
     data_end += 1;
-    // TODO: Inject code with RETF: then every type [x,x,x] is valid.
-    new_code[0] = 0xFE;
+    new_code[0] = static_cast<uint8_t>(nonreturning ? evmone::OP_INVALID
+                                                    : evmone::OP_RETF);
 
     // TODO: Validate.
     const auto new_size = data_end - data_;
