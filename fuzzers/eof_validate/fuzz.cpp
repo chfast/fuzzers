@@ -23,6 +23,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   const auto v_status = validate_eof(REV, ContainerKind::runtime, data);
   assert(v_status != EOFValidationError::impossible);
 
+  const auto initcode_status = validate_eof(REV, ContainerKind::initcode, data);
+
   // if (v_status != EOFValidationError::success) {
   //   // Inspect found categories.
   //   const auto cat = get_cat(v_status);
@@ -33,16 +35,19 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   // }
 
   const auto evm1_ok = v_status == EOFValidationError::success;
+  const auto evm1_ik = initcode_status == EOFValidationError::success;
+  const auto evm1_v2 = (evm1_ik << 1) | evm1_ok;
+
   switch (v_status) {
   // case EOFValidationError::invalid_non_returning_flag: // incorrect
   // case EOFValidationError::success:                    // incorrect
   // break;
   default: {
     // std::cerr << "XXXX " << v_status << "\n";
-    const auto revm_ok = fzz_revm_validate_eof(data_ptr, data_size);
-    if (revm_ok != evm1_ok) {
-      std::cerr << "evm1: " << v_status << "\n"
-                << "revm: " << revm_ok << "\n"
+    const auto revm_v2 = fzz_revm_validate_eof(data_ptr, data_size);
+    if (revm_v2 != evm1_v2) {
+      std::cerr << "evm1: " << v_status << " " << initcode_status << "\n"
+                << "revm: " << revm_v2 << "\n"
                 << "code: " << hex(data) << "\n"
                 << "size: " << data.size() << "\n";
       std::abort();
