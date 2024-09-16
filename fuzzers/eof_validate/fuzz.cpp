@@ -1,5 +1,6 @@
 #include "eof_validate.hpp"
 #include <besu_fzz.hpp>
+#include <geth_fzz.h>
 #include <iostream>
 #include <revm_fzz.hpp>
 #include <test/utils/bytecode.hpp>
@@ -65,6 +66,24 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   }
   }
 
+  switch (v_status) {
+  // case EOFValidationError::incompatible_container_kind:
+  // break;
+  default: {
+    // std::cerr << "XXXX " << v_status << "\n";
+    const auto go_ok = geth_fzz_eof_validate(const_cast<uint8_t*>(data_ptr),
+                                             static_cast<GoInt>(data_size));
+    const auto ok = go_ok != 0;
+    if (ok != evm1_ok) {
+      std::cerr << "evm1: " << v_status << "\n"
+                << "geth: " << ok << "\n"
+                << "code: " << hex(data) << "\n"
+                << "size: " << data.size() << "\n";
+      std::abort();
+    }
+  }
+  }
+
   const auto p_vh_status = std::get_if<EOFValidationError>(&vh);
   assert(p_vh_status == nullptr || *p_vh_status != EOFValidationError::success);
   const auto vh_status =
@@ -84,7 +103,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   //   bc.data(bytes{h.get_data(data)});
   //
   //   for (size_t i = 1; i < h.code_sizes.size(); ++i)
-  //     bc.code(bytes{h.get_code(data, i)}, h.types[i].inputs, h.types[i].outputs,
+  //     bc.code(bytes{h.get_code(data, i)}, h.types[i].inputs,
+  //     h.types[i].outputs,
   //             h.types[i].max_stack_height);
   //
   //   for (size_t i = 0; i < h.container_sizes.size(); ++i)
