@@ -60,10 +60,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   // break;
   default: {
     // std::cerr << "XXXX " << v_status << "\n";
-    const auto ok = fzz_besu_validate_eof(data_ptr, data_size);
-    if (ok != evm1_ok) {
-      std::cerr << "evm1: " << v_status << "\n"
-                << "besu: " << ok << "\n"
+    const auto besu_v2 = fzz_besu_validate_eof(data_ptr, data_size);
+    if (besu_v2 != evm1_v2) {
+      std::cerr << "evm1: " << v_status << " " << initcode_status << "\n"
+                << "besu: " << besu_v2 << "\n"
                 << "code: " << hex(data) << "\n"
                 << "size: " << data.size() << "\n";
       std::abort();
@@ -76,12 +76,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_ptr,
   // break;
   default: {
     // std::cerr << "XXXX " << v_status << "\n";
-    const auto go_ok = geth_fzz_eof_validate(const_cast<uint8_t*>(data_ptr),
-                                             static_cast<GoInt>(data_size));
-    const auto ok = go_ok != 0;
-    if (ok != evm1_ok) {
-      std::cerr << "evm1: " << v_status << "\n"
-                << "geth: " << ok << "\n"
+    const auto geth_v2 = geth_fzz_eof_validate(const_cast<uint8_t*>(data_ptr),
+                                               static_cast<GoInt>(data_size));
+    if (geth_v2 != evm1_v2) {
+      std::cerr << "evm1: " << v_status << " " << initcode_status << "\n"
+                << "geth: " << geth_v2 << "\n"
                 << "code: " << hex(data) << "\n"
                 << "size: " << data.size() << "\n";
       std::abort();

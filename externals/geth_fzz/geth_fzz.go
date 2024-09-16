@@ -10,22 +10,25 @@ import "github.com/ethereum/go-ethereum/core/vm"
 
 var jt = vm.NewPragueEOFInstructionSetForTesting()
 
-//export geth_fzz_eof_validate
-func geth_fzz_eof_validate(data *byte, size int) bool {
-    b := unsafe.Slice(data, size);
+func validateEOF(b []byte, initcode bool) int32 {
     c := vm.Container{}
-    err := c.UnmarshalBinary(b, false)
+    err := c.UnmarshalBinary(b, initcode)
     if err != nil {
-        //fmt.Println(fmt.Errorf("geth err: %v", err))
-        return false
+        return 0
     }
+    err = c.ValidateCode(&jt, initcode)
+    if err != nil {
+        return 0
+    }
+    return 1
+}
 
-    err = c.ValidateCode(&jt, false)
-    if err != nil {
-        //fmt.Println(fmt.Errorf("geth err: %v", err))
-        return false
-    }
-    return true
+//export geth_fzz_eof_validate
+func geth_fzz_eof_validate(data *byte, size int) int32 {
+    b := unsafe.Slice(data, size);
+    rt := validateEOF(b, false)
+    ic := validateEOF(b, true)
+    return (ic << 1) | rt
 }
 
 func main() {

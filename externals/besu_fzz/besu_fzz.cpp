@@ -49,7 +49,7 @@ struct JVM {
       std::abort();
     }
 
-    validateEOF = env->GetStaticMethodID(fzz_class, "validateEOF", "([BI)Z");
+    validateEOF = env->GetStaticMethodID(fzz_class, "validateEOF", "([BI)I");
 
     byteArr = env->NewByteArray(byteArrLen);
   }
@@ -60,7 +60,7 @@ struct JVM {
 JVM jvm;
 } // namespace
 
-bool fzz_besu_validate_eof(const uint8_t* data, size_t size) noexcept {
+int32_t fzz_besu_validate_eof(const uint8_t* data, size_t size) noexcept {
   // TODO: Besu recognizes legacy by prefix, so don't pass non-EOF code.
   if (size < 2 || data[0] != 0xEF || data[1] != 0x00)
     return false;
@@ -78,8 +78,8 @@ bool fzz_besu_validate_eof(const uint8_t* data, size_t size) noexcept {
 
   env->SetByteArrayRegion(jvm.byteArr, 0, length,
                           reinterpret_cast<const jbyte*>(data));
-  const auto res = env->CallStaticBooleanMethod(jvm.fzz_class, jvm.validateEOF,
-                                                jvm.byteArr, length);
+  const auto res = env->CallStaticIntMethod(jvm.fzz_class, jvm.validateEOF,
+                                            jvm.byteArr, length);
   if (env->ExceptionOccurred() != nullptr) {
     env->ExceptionDescribe();
     env->ExceptionClear();
