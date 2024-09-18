@@ -2,7 +2,7 @@ module github.com/chfast/fuzzers/geth_fzz
 
 go 1.22.2
 
-replace github.com/ethereum/go-ethereum v1.14.8 => github.com/shemnon/go-ethereum v0.0.0-20240914220046-c7efbf466e7a
+replace github.com/ethereum/go-ethereum v1.14.8 => github.com/shemnon/go-ethereum v0.0.0-20240917232259-740ad8cc9837
 
 require github.com/ethereum/go-ethereum v1.14.8
 
