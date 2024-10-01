@@ -2,9 +2,9 @@ module github.com/chfast/fuzzers/geth_fzz
 
 go 1.22.2
 
-replace github.com/ethereum/go-ethereum v1.14.8 => github.com/shemnon/go-ethereum v0.0.0-20240917232259-740ad8cc9837
+replace github.com/ethereum/go-ethereum v1.14.11 => github.com/MariusVanDerWijden/go-ethereum v0.0.0-20240926075441-aee85e3c6fb3
 
-require github.com/ethereum/go-ethereum v1.14.8
+require github.com/ethereum/go-ethereum v1.14.11
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
