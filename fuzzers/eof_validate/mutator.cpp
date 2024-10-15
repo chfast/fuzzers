@@ -520,10 +520,9 @@ public:
     assert(container.size() <= max_size_);
     auto header_or_err = evmone::validate_header(REV, container);
     if (std::holds_alternative<evmone::EOFValidationError>(header_or_err)) {
-      // TODO(evmone): validate_header also validates types.
-      assert(get<evmone::EOFValidationError>(header_or_err) == err);
-      assert(get_cat(err) == EOFErrCat::type);
-      return mutate_all();
+      // TODO: validate_types now happens after header. Should we use mutate
+      //   types only if they are invalid?
+      std::abort();
     }
 
     hdr_ = std::get<evmone::EOF1Header>(std::move(header_or_err));
