@@ -2,7 +2,7 @@ module github.com/chfast/fuzzers/geth_fzz
 
 go 1.22.2
 
-replace github.com/ethereum/go-ethereum v1.14.11 => github.com/MariusVanDerWijden/go-ethereum v0.0.0-20240926075441-aee85e3c6fb3
+replace github.com/ethereum/go-ethereum v1.14.11 => github.com/shemnon/go-ethereum v0.0.0-20241104140450-1aba6591c199
 
 require github.com/ethereum/go-ethereum v1.14.11
 
@@ -50,7 +50,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
-	github.com/supranational/blst v0.3.11 // indirect
+	github.com/supranational/blst v0.3.13 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect

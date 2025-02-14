@@ -2,7 +2,7 @@
 #include <evmone/eof.hpp>
 
 namespace fzz {
-constexpr auto REV = EVMC_PRAGUE;
+constexpr auto REV = EVMC_OSAKA;
 
 enum class EOFErrCat { header, body, type, code, subcont, ref, other };
 
