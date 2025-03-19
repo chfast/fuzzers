@@ -1,5 +1,7 @@
 # evmone
 # https://github.com/ethereum/evmone
+
+set(EVMONE_TESTING ON CACHE BOOL "Build tests and test tools" FORCE)
 add_subdirectory(evmone EXCLUDE_FROM_ALL)
 
 # Fixups.
