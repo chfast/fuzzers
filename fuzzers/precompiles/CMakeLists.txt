@@ -6,6 +6,7 @@ target_sources(
     precompiles-fuzz
     PRIVATE
     fuzz.cpp
+    state_test_mutator.cpp
 )
 
 # FIXME:
