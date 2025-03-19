@@ -1,3 +1,5 @@
+#include "test/utils/bytecode.hpp"
+
 #include <cassert>
 #include <cstring>
 #include <random>
@@ -165,21 +167,53 @@ using namespace evmone::test;
 
 namespace {
 constexpr auto REV = EVMC_PRAGUE;
+constexpr auto SENDER = 0xe100713FC15400D1e94096a545879E7c6407001e_address;
 constexpr auto BASEFEE = 10;
 constexpr auto GAS_LIMIT = 1'000'000;
 constexpr auto PRECOMPILE_PROXY = 0x00097ec03911e0097087_address;
+
+const auto precompile_proxy_code = [] {
+  const auto store_loop_head = 29;
+  const auto store_loop_body = 37;
+  auto code =
+      bytecode() +                                      //
+      OP_PUSH0 + OP_PUSH0 + OP_CALLDATASIZE +           // [input_size, 0, 0]
+      OP_DUP1 + OP_PUSH0 + OP_PUSH0 + OP_CALLDATACOPY + // [input_size, 0, 0]
+      OP_PUSH0 + OP_CALLVALUE + OP_GAS + // [gas, addr, 0, input_size, 0, 0]
+      OP_STATICCALL +                    // [return_code]
+      sstore(1) +                        // [] store the return code @ 1.
+      OP_RETURNDATASIZE +                // [output_size]
+      OP_DUP1 + OP_PUSH0 + OP_PUSH0 + OP_RETURNDATACOPY + // [output_size]
+      OP_PUSH0 + OP_DUP2 +
+      OP_MSTORE +           // [output_size]  clear 32 bytes after the output.
+      OP_DUP1 + sstore(2) + // [output_size]  store the output size @ 2.
+      push(32) +            // [32, output_size]
+      OP_PUSH0 +            // [off=0, 32, output_size]
+      OP_JUMPDEST +         // @store-loop-head
+      OP_DUP3 + OP_DUP2 + OP_LT +  // [off < output_size, off, 32, output_size]
+      store_loop_body + OP_JUMPI + // [off, 32, output_size] → @store-loop-body
+      OP_STOP +                    //
+      OP_JUMPDEST +                // @store-loop-body
+      OP_DUP1 + OP_MLOAD +         // [output[off], off, 32, output_size]
+      OP_DUP2 + OP_SSTORE + // [off, 32, output_size] store output[off] @ off.
+      OP_DUP2 + OP_ADD +    // [off+=32, 32, output_size]
+      store_loop_head + OP_JUMP; // [off, 32, output_size] → @store-loop-head
+  return bytes{code};
+}();
 
 StateTransitionTest build_minimal_precompile_proxy_test() {
   StateTransitionTest test;
   auto& c = test.cases.emplace_back();
   c.block.number = 1;
+  c.block.gas_limit = GAS_LIMIT;
+  c.block.base_fee = BASEFEE;
   c.rev = REV;
   auto& m = test.multi_tx;
   m.gas_limits.emplace_back();
   m.inputs.emplace_back();
   m.values.emplace_back(1);
   auto& e = c.expectations.emplace_back();
-  auto tx = m.get(e.indexes);
+  m.sender = SENDER;
   return test;
 }
 
@@ -212,6 +246,11 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
   }
   if (!test)
     test = build_minimal_precompile_proxy_test();
+
+  // Setup precompile proxy test.
+  auto& precompile_proxy = test->pre_state[PRECOMPILE_PROXY];
+  precompile_proxy.code = precompile_proxy_code;
+  test->multi_tx.to = PRECOMPILE_PROXY;
 
   // Save the test.
   auto& c = test->cases[0];
