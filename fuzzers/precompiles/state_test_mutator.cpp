@@ -209,11 +209,18 @@ StateTransitionTest build_minimal_precompile_proxy_test() {
   c.block.base_fee = BASEFEE;
   c.rev = REV;
   auto& m = test.multi_tx;
-  m.gas_limits.emplace_back();
+  m.gas_limits.emplace_back(c.block.gas_limit);
   m.inputs.emplace_back();
   m.values.emplace_back(1);
   auto& e = c.expectations.emplace_back();
   m.sender = SENDER;
+  m.max_gas_price = c.block.base_fee;
+  m.max_priority_gas_price = c.block.base_fee;
+
+  test.pre_state[SENDER] = {
+      .balance = 10'000'000'000,
+  };
+
   return test;
 }
 
