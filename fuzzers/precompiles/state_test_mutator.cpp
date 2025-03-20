@@ -299,17 +299,17 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
   auto& c = test->cases[0];
   auto tx = test->multi_tx.get(c.expectations[0].indexes);
   const auto& [rev, cases, block] = test->cases[0];
-  auto state = test->pre_state;
-
-  const auto res = transition(
-      state, block, test->block_hashes, tx, rev, vm, block.gas_limit,
-      static_cast<int64_t>(evmone::state::max_blob_gas_per_block(rev)));
-
-  // Finalize block with reward 0.
-  finalize(state, rev, block.coinbase, 0, {}, {});
+  // auto state = test->pre_state;
+  //
+  // const auto res = transition(
+  //     state, block, test->block_hashes, tx, rev, vm, block.gas_limit,
+  //     static_cast<int64_t>(evmone::state::max_blob_gas_per_block(rev)));
+  //
+  // // Finalize block with reward 0.
+  // finalize(state, rev, block.coinbase, 0, {}, {});
 
   // Save the test.
-  auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, res, state);
+  auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, {}, {});
   std::ostringstream output_stream;
   output_stream << std::setw(2) << j;
   const auto output = output_stream.str();
