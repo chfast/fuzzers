@@ -1,2 +1,2 @@
 include(evmone.cmake)
-include(libff.cmake)
+#include(libff.cmake)
