@@ -1,3 +1,5 @@
+#include "evmone/evmone.h"
+#include "test/state/mpt_hash.hpp"
 #include "test/utils/bytecode.hpp"
 
 #include <cassert>
@@ -166,6 +168,8 @@ using namespace evmc::literals;
 using namespace evmone::test;
 
 namespace {
+evmc::VM vm{evmc_create_evmone()};
+
 constexpr auto REV = EVMC_PRAGUE;
 constexpr auto SENDER = 0xe100713FC15400D1e94096a545879E7c6407001e_address;
 constexpr auto BASEFEE = 10;
@@ -289,11 +293,23 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
     calldata = calldata_copy;
   }
 
-  // Save the test.
+  // Execute state: we need the result so that the test file is ready to go.
+  // TODO: This should be taken off the mutation.
+
   auto& c = test->cases[0];
   auto tx = test->multi_tx.get(c.expectations[0].indexes);
-  auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, {},
-                         test->pre_state);
+  const auto& [rev, cases, block] = test->cases[0];
+  auto state = test->pre_state;
+
+  const auto res = transition(
+      state, block, test->block_hashes, tx, rev, vm, block.gas_limit,
+      static_cast<int64_t>(evmone::state::max_blob_gas_per_block(rev)));
+
+  // Finalize block with reward 0.
+  finalize(state, rev, block.coinbase, 0, {}, {});
+
+  // Save the test.
+  auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, res, state);
   std::ostringstream output_stream;
   output_stream << std::setw(2) << j;
   const auto output = output_stream.str();
