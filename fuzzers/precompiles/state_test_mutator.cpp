@@ -259,6 +259,23 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
   precompile_proxy.code = precompile_proxy_code;
   test->multi_tx.to = PRECOMPILE_PROXY;
 
+  // Mutate the precompile input.
+  {
+    auto& calldata = test->multi_tx.inputs[0];
+    bytes calldata_copy = calldata;
+
+    // calldata will be hex encoded, so we can extend it by the half of
+    // available space.
+    const auto max_calldata_size = calldata.size() + (max_size - size) / 2;
+    assert(max_calldata_size >= calldata.size());
+    assert(max_calldata_size < max_size);
+    calldata_copy.resize(max_calldata_size);
+    const auto new_size = LLVMFuzzerMutate(calldata_copy.data(),
+                                           calldata.size(), max_calldata_size);
+    calldata_copy.resize(new_size);
+    calldata = calldata_copy;
+  }
+
   // Save the test.
   auto& c = test->cases[0];
   auto tx = test->multi_tx.get(c.expectations[0].indexes);
