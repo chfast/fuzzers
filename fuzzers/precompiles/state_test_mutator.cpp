@@ -244,6 +244,8 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
                                           size_t max_size, unsigned int seed) {
   assert(size != 0);
 
+  std::minstd_rand rand_{seed};
+
   std::string input{reinterpret_cast<const char*>(data), size};
   std::istringstream input_stream{input};
 
@@ -259,8 +261,19 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
   precompile_proxy.code = precompile_proxy_code;
   test->multi_tx.to = PRECOMPILE_PROXY;
 
-  // Mutate the precompile input.
-  {
+  if (rand_() % 100 < 1) {
+    // Mutate the precompile id.
+    const auto id = test->multi_tx.values[0][0];
+    const auto new_id = (id + rand_()) % 0x13;
+    test->multi_tx.values[0][0] = new_id;
+  } else if (rand_() % 100 < 2) {
+    // Mutate the precompile gas limit.
+    const auto gas_limit = test->multi_tx.gas_limits[0];
+    const auto new_gas_limit =
+        (gas_limit + static_cast<int64_t>(rand_() % 1000 - 500)) %
+        test->cases[0].block.gas_limit;
+    test->multi_tx.gas_limits[0] = new_gas_limit;
+  } else { // Mutate the precompile input.
     auto& calldata = test->multi_tx.inputs[0];
     bytes calldata_copy = calldata;
 
@@ -282,7 +295,7 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
   auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, {},
                          test->pre_state);
   std::ostringstream output_stream;
-  output_stream << j;
+  output_stream << std::setw(2) << j;
   const auto output = output_stream.str();
   if (output.size() > max_size)
     return 0;
