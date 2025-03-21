@@ -1,3 +1,5 @@
+#include "common.hpp"
+
 #include <evmone/evmone.h>
 #include <filesystem>
 #include <fstream>
@@ -49,7 +51,31 @@ static void run_state_test(const StateTransitionTest& test, evmc::VM& vm) {
 
 namespace {
 
-std::string export_test(std::string input) { return input; }
+std::optional<std::string> export_test(std::istream& input) {
+  try {
+    const auto test = fzz::load_state_test(input);
+    auto& c = test->cases[0];
+    auto tx = test->multi_tx.get(c.expectations[0].indexes);
+    const auto& [rev, cases, block] = test->cases[0];
+    auto state = test->pre_state;
+
+    // Execute the test to fill the expected section.
+    const auto res = transition(
+        state, block, test->block_hashes, tx, rev, vm, block.gas_limit,
+        static_cast<int64_t>(evmone::state::max_blob_gas_per_block(rev)));
+
+    // Finalize block with reward 0.
+    finalize(state, rev, block.coinbase, 0, {}, {});
+
+    // Save the test.
+    auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, res, state);
+    std::ostringstream output_stream;
+    output_stream << std::setw(2) << j;
+    return output_stream.str();
+  } catch (...) {
+    return std::nullopt;
+  }
+}
 
 void export_corpus(std::string_view extension, const fs::path& corpus_dir,
                    const fs::path& out_dir) {
@@ -57,9 +83,11 @@ void export_corpus(std::string_view extension, const fs::path& corpus_dir,
     if (entry.is_regular_file()) {
 
       std::ifstream in{entry.path(), std::ios::binary};
-      std::string content((std::istreambuf_iterator<char>(in)),
-                          std::istreambuf_iterator<char>());
-      std::string exported = export_test(content);
+      const auto exported = export_test(in);
+      if (!exported.has_value()) {
+        std::cerr << "Failed to export " << entry.path() << "\n";
+        continue;
+      }
 
       auto filename = entry.path().filename();
       if (!filename.has_extension()) {
@@ -67,7 +95,7 @@ void export_corpus(std::string_view extension, const fs::path& corpus_dir,
       }
       const auto out_path = out_dir / filename;
       std::ofstream out{out_path, std::ios::binary};
-      out << exported;
+      out << *exported;
       if (!out) {
         std::cerr << "Failed to write to " << out_path << "\n";
       }
