@@ -5,6 +5,8 @@ target_link_libraries(precompiles-fuzz PRIVATE evmone::precompiles evmone::state
 target_sources(
     precompiles-fuzz
     PRIVATE
+    common.hpp
+    common.cpp
     fuzz.cpp
     state_test_mutator.cpp
 )

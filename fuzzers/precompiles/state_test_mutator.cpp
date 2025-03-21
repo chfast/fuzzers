@@ -1,11 +1,11 @@
-#include "evmone/evmone.h"
-#include "test/state/mpt_hash.hpp"
-#include "test/utils/bytecode.hpp"
-
+#include "common.hpp"
 #include <cassert>
 #include <cstring>
+#include <evmone/evmone.h>
 #include <random>
+#include <test/state/mpt_hash.hpp>
 #include <test/statetest/statetest.hpp>
+#include <test/utils/bytecode.hpp>
 
 // Experimental, may go away in the future.
 // libFuzzer-provided function to be used inside LLVMFuzzerCustomMutator.
@@ -227,21 +227,6 @@ StateTransitionTest build_minimal_precompile_proxy_test() {
 
   return test;
 }
-
-std::optional<StateTransitionTest> load_state_test(std::istream& input) {
-  std::vector<StateTransitionTest> tests;
-  try {
-    tests = load_state_tests(input);
-  } catch (const json::json::exception&) {
-    return std::nullopt;
-  }
-  if (tests.empty())
-    return std::nullopt;
-
-  // FIXME: Handle files with multiple tests.
-  assert(tests.size() == 1);
-  return tests[0];
-}
 } // namespace
 
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
@@ -255,7 +240,7 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
 
   std::optional<StateTransitionTest> test;
   if (size > 1) {
-    test = load_state_test(input_stream);
+    test = fzz::load_state_test(input_stream);
   }
   if (!test)
     test = build_minimal_precompile_proxy_test();
