@@ -5,7 +5,6 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -40,9 +39,9 @@ func GethRunTest(src []byte) {
 			test.Run(st, cfg, false, rawdb.HashScheme, func(err error, state *tests.StateTestState) {
 				var root common.Hash
 				if state.StateDB != nil {
+					// FIXME: Check state root.
 					root = state.StateDB.IntermediateRoot(false)
 					result.Root = &root
-					fmt.Fprintf(os.Stderr, "{\"stateRoot\": \"%#x\"}\n", root)
 				}
 				if err != nil {
 					// Test failed, mark as so.

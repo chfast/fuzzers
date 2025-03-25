@@ -1,7 +1,7 @@
 add_executable(precompiles-fuzz)
 target_compile_features(precompiles-fuzz PRIVATE cxx_std_23)
 target_link_options(precompiles-fuzz PRIVATE -fsanitize=fuzzer)
-target_link_libraries(precompiles-fuzz PRIVATE evmone::precompiles evmone::statetestutils)
+target_link_libraries(precompiles-fuzz PRIVATE evmone::precompiles evmone::statetestutils ${CMAKE_SOURCE_DIR}/externals/geth/geth.a)
 target_sources(
     precompiles-fuzz
     PRIVATE

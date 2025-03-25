@@ -1,5 +1,5 @@
 // The build command:
-// go build -v -o geth_fzz.a -buildmode=c-archive -tags=libfuzzer -gcflags=all=-d=libfuzzer
+// go build -v -o geth.a -buildmode=c-archive -tags=libfuzzer -gcflags=all=-d=libfuzzer
 
 package main
 
