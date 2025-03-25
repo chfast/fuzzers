@@ -23,21 +23,20 @@ type testResult struct {
 	Error string       `json:"error,omitempty"`
 }
 
-// export: geth_run_test
-func GethRunTest(src []byte) ([]testResult, error) {
+//export GethRunTest
+func GethRunTest(src []byte) {
 	var testsByName map[string]tests.StateTest
 	if err := json.Unmarshal(src, &testsByName); err != nil {
-		return nil, fmt.Errorf("unable to read test: %w", err)
+		panic(fmt.Errorf("unable to read test: %w", err))
 	}
 
 	cfg := vm.Config{}
 
 	// Iterate over all the tests, run them and aggregate the results
-	results := make([]testResult, 0, len(testsByName))
-	for key, test := range testsByName {
+	result := &testResult{Pass: true}
+	for _, test := range testsByName {
 		for _, st := range test.Subtests() {
 			// Run the test and aggregate the result
-			result := &testResult{Name: key, Fork: st.Fork, Pass: true}
 			test.Run(st, cfg, false, rawdb.HashScheme, func(err error, state *tests.StateTestState) {
 				var root common.Hash
 				if state.StateDB != nil {
@@ -47,12 +46,9 @@ func GethRunTest(src []byte) ([]testResult, error) {
 				}
 				if err != nil {
 					// Test failed, mark as so.
-					result.Pass, result.Error = false, err.Error()
-					return
+					panic(err)
 				}
 			})
-			results = append(results, *result)
 		}
 	}
-	return results, nil
 }
