@@ -6,8 +6,6 @@
 #include <iostream>
 #include <test/statetest/statetest.hpp>
 
-#include "../../externals/geth/geth.h"
-
 namespace fs = std::filesystem;
 using namespace evmone::test;
 
@@ -110,16 +108,16 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   std::string input{reinterpret_cast<const char*>(data), size};
   std::istringstream input_stream{input};
 
-  const auto test = export_test(input_stream);
-  if (!test) {
-    // FIXME: Should we crash?
+  try {
+    const auto state_tests = load_state_tests(input_stream);
+    if (state_tests.empty())
+      return -1;
+
+    run_state_test(state_tests[0], vm);
+
+  } catch (const json::json::exception&) {
     return -1;
   }
-
-  GoSlice go_test{const_cast<char*>(test->data()),
-                  static_cast<GoInt>(test->size()),
-                  static_cast<GoInt>(test->size())};
-  GethRunTest(go_test);
 
   return 0;
 }
