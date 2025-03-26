@@ -260,11 +260,13 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
       block_gas_limit = GAS_LIMIT;
     }
 
-    const auto gas_limit = test->multi_tx.gas_limits[0];
-    const auto new_gas_limit =
-        (gas_limit + static_cast<int64_t>(rand_() % 100'000 - 50'000)) %
-        block_gas_limit;
-    test->multi_tx.gas_limits[0] = new_gas_limit;
+    auto& gas_limit = test->multi_tx.gas_limits[0];
+    const auto new_gas_limit = rand_() % block_gas_limit;
+    // if (new_gas_limit > gas_limit)
+    //   std::cerr << "tx gas limit " << gas_limit << " → " << new_gas_limit
+    //             << "\n";
+
+    gas_limit = new_gas_limit;
   } else { // Mutate the precompile input.
     auto& calldata = test->multi_tx.inputs[0];
     bytes calldata_copy = calldata;
