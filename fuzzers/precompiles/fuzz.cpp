@@ -56,6 +56,8 @@ namespace {
 std::optional<std::string> export_test(std::istream& input) {
   try {
     const auto test = fzz::load_state_test(input);
+    if (!test)
+      return std::nullopt;  // FIXME: When can it happen?
     auto& c = test->cases[0];
     auto tx = test->multi_tx.get(c.expectations[0].indexes);
     const auto& [rev, cases, block] = test->cases[0];
@@ -110,19 +112,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   std::string input{reinterpret_cast<const char*>(data), size};
   std::istringstream input_stream{input};
 
-  try {
-    const auto state_tests = load_state_tests(input_stream);
-    if (state_tests.empty())
-      return -1;
-
-    run_state_test(state_tests[0], vm);
-
-  } catch (const json::json::exception&) {
-    return -1;
-  }
-
-  std::istringstream input_stream2{input};
-  const auto test = export_test(input_stream2);
+  const auto test = export_test(input_stream);
   if (!test) {
     std::cerr << "Failed to export test\n";
     return -1;
