@@ -1,4 +1,5 @@
 #include "common.hpp"
+#include "precompile_input_mutator.hpp"
 #include <cassert>
 #include <cstring>
 #include <random>
@@ -277,8 +278,18 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
     assert(max_calldata_size >= calldata.size());
     assert(max_calldata_size < max_size);
     calldata_copy.resize(max_calldata_size);
-    const auto new_size = LLVMFuzzerMutate(calldata_copy.data(),
-                                           calldata.size(), max_calldata_size);
+
+    const auto& id = test->multi_tx.values[0];
+    size_t new_size;
+    if (id != 0 && id <= std::to_underlying(PrecompileId::latest) &&
+        rand() % 100 >= 1) {
+      new_size = mutate_precompile_input(
+          rand_, static_cast<PrecompileId>(id[0]), calldata_copy.data(),
+          calldata.size(), max_calldata_size);
+    } else {
+      new_size = LLVMFuzzerMutate(calldata_copy.data(), calldata.size(),
+                                  max_calldata_size);
+    }
     calldata_copy.resize(new_size);
     calldata = calldata_copy;
   }

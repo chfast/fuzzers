@@ -8,6 +8,8 @@ target_sources(
     common.hpp
     common.cpp
     fuzz.cpp
+    precompile_input_mutator.hpp
+    precompile_input_mutator.cpp
     state_test_mutator.cpp
 )
 
