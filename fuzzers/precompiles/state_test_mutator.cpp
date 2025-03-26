@@ -169,7 +169,7 @@ namespace {
 constexpr auto REV = EVMC_PRAGUE;
 constexpr auto SENDER = 0xe100713FC15400D1e94096a545879E7c6407001e_address;
 constexpr auto BASEFEE = 10;
-constexpr auto GAS_LIMIT = 1'000'000;
+constexpr auto GAS_LIMIT = 40'000'000;
 constexpr auto PRECOMPILE_PROXY = 0x00097ec03911e0097087_address;
 
 const auto precompile_proxy_code = [] {
@@ -253,10 +253,17 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
     test->multi_tx.values[0][0] = new_id;
   } else if (rand_() % 100 < 2) {
     // Mutate the precompile gas limit.
+    auto& block_gas_limit = test->cases[0].block.gas_limit;
+
+    // Bump the block gas limit in case the constant has changed.
+    if (block_gas_limit < GAS_LIMIT) {
+      block_gas_limit = GAS_LIMIT;
+    }
+
     const auto gas_limit = test->multi_tx.gas_limits[0];
     const auto new_gas_limit =
-        (gas_limit + static_cast<int64_t>(rand_() % 1000 - 500)) %
-        test->cases[0].block.gas_limit;
+        (gas_limit + static_cast<int64_t>(rand_() % 100'000 - 50'000)) %
+        block_gas_limit;
     test->multi_tx.gas_limits[0] = new_gas_limit;
   } else { // Mutate the precompile input.
     auto& calldata = test->multi_tx.inputs[0];
