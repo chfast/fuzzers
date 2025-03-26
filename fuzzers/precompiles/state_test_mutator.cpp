@@ -270,28 +270,26 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
     gas_limit = new_gas_limit;
   } else { // Mutate the precompile input.
     auto& calldata = test->multi_tx.inputs[0];
-    bytes calldata_copy = calldata;
 
     // calldata will be hex encoded, so we can extend it by the half of
     // available space.
     const auto max_calldata_size = calldata.size() + (max_size - size) / 2;
     assert(max_calldata_size >= calldata.size());
     assert(max_calldata_size < max_size);
-    calldata_copy.resize(max_calldata_size);
+    calldata.resize(max_calldata_size);
 
     const auto& id = test->multi_tx.values[0];
     size_t new_size;
     if (id != 0 && id <= std::to_underlying(PrecompileId::latest) &&
         rand() % 100 >= 1) {
       new_size = mutate_precompile_input(
-          rand_, static_cast<PrecompileId>(id[0]), calldata_copy.data(),
+          rand_, static_cast<PrecompileId>(id[0]), calldata.data(),
           calldata.size(), max_calldata_size);
     } else {
-      new_size = LLVMFuzzerMutate(calldata_copy.data(), calldata.size(),
+      new_size = LLVMFuzzerMutate(calldata.data(), calldata.size(),
                                   max_calldata_size);
     }
-    calldata_copy.resize(new_size);
-    calldata = calldata_copy;
+    calldata.resize(new_size);
   }
 
   // Save the test.
