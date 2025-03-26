@@ -296,9 +296,7 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size,
   auto& c = test->cases[0];
   auto tx = test->multi_tx.get(c.expectations[0].indexes);
   auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, {}, {});
-  std::ostringstream output_stream;
-  output_stream << std::setw(2) << j;
-  const auto output = output_stream.str();
+  const auto output = to_string(j);
   if (output.size() > max_size)
     return 0;
 
