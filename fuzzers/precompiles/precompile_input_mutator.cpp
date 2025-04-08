@@ -1,5 +1,7 @@
 #include "precompile_input_mutator.hpp"
 
+#include <blst.h>
+
 // Experimental, may go away in the future.
 // libFuzzer-provided function to be used inside LLVMFuzzerCustomMutator.
 // Mutates raw data in [data, data+size) inplace.
@@ -24,8 +26,41 @@ size_t mutate_bls12_g1add(std::minstd_rand& rand, uint8_t* data, size_t size,
   if (size > EXPECTED_SIZE)
     return EXPECTED_SIZE;
 
-  // FIXME: Implement a proper mutation.
-  LLVMFuzzerMutate(data, EXPECTED_SIZE, EXPECTED_SIZE);
+  if (std::count(data, data + 16, 0) != 16) {
+    std::memset(data, 0, 16);
+    return EXPECTED_SIZE;
+  }
+  if (std::count(data + 64, data + 64 + 16, 0) != 16) {
+    std::memset(data + 64, 0, 16);
+    return EXPECTED_SIZE;
+  }
+  if (std::count(data + 128, data + 128 + 16, 0) != 16) {
+    std::memset(data + 128, 0, 16);
+    return EXPECTED_SIZE;
+  }
+  if (std::count(data + 192, data + 192 + 16, 0) != 16) {
+    std::memset(data + 192, 0, 16);
+    return EXPECTED_SIZE;
+  }
+
+  blst_fp x0, y0, x1, y1;
+  blst_fp_from_bendian(&x0, data + 16);
+  blst_fp_from_bendian(&y0, data + 16 + 64);
+  blst_fp_from_bendian(&x1, data + 16 + 128);
+  blst_fp_from_bendian(&y1, data + 16 + 192);
+
+  blst_p1_affine p{x0, y0};
+  blst_p1_affine q{x1, y1};
+
+  const auto s = rand() % 2 == 0 ? &p : &q;
+
+  blst_p1 r;
+  blst_p1_add_or_double_affine(&r, blst_p1_generator(), s);
+  blst_p1_to_affine(s, &r);
+
+  const auto out = data + (rand() % 2 == 0 ? 0 : BLS12_G1_POINT_SIZE);
+  blst_bendian_from_fp(out + 16, &s->x);
+  blst_bendian_from_fp(out + 16 + 64, &s->y);
   return EXPECTED_SIZE;
 }
 } // namespace
