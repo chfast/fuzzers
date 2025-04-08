@@ -7,5 +7,5 @@ import "C"
 import "fmt"
 
 func main() {
-    fmt.Println("geth fzz main()")
+	fmt.Println("geth fzz main()")
 }
