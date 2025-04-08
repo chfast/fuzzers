@@ -1,7 +1,8 @@
 #include "common.hpp"
 
 namespace fzz {
-std::optional<StateTransitionTest> load_state_test(std::istream& input) {
+std::optional<StateTransitionTest>
+load_state_test(std::istream& input) noexcept {
   std::vector<StateTransitionTest> tests;
   try {
     tests = load_state_tests(input);
@@ -15,4 +16,4 @@ std::optional<StateTransitionTest> load_state_test(std::istream& input) {
   assert(tests.size() == 1);
   return tests[0];
 }
-}
+} // namespace fzz

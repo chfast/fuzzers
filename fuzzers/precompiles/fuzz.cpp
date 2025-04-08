@@ -54,31 +54,27 @@ static void run_state_test(const StateTransitionTest& test, evmc::VM& vm) {
 namespace {
 
 std::optional<std::string> export_test(std::istream& input) {
-  try {
-    const auto test = fzz::load_state_test(input);
-    if (!test)
-      return std::nullopt;  // FIXME: When can it happen?
-    auto& c = test->cases[0];
-    auto tx = test->multi_tx.get(c.expectations[0].indexes);
-    const auto& [rev, cases, block] = test->cases[0];
-    auto state = test->pre_state;
+  const auto test = fzz::load_state_test(input);
+  if (!test)
+    return std::nullopt; // likely due to truncated input file
+  auto& c = test->cases[0];
+  auto tx = test->multi_tx.get(c.expectations[0].indexes);
+  const auto& [rev, cases, block] = test->cases[0];
+  auto state = test->pre_state;
 
-    // Execute the test to fill the expected section.
-    const auto res = transition(
-        state, block, test->block_hashes, tx, rev, vm, block.gas_limit,
-        static_cast<int64_t>(evmone::state::max_blob_gas_per_block(rev)));
+  // Execute the test to fill the expected section.
+  const auto res = transition(
+      state, block, test->block_hashes, tx, rev, vm, block.gas_limit,
+      static_cast<int64_t>(evmone::state::max_blob_gas_per_block(rev)));
 
-    // Finalize block with reward 0.
-    finalize(state, rev, block.coinbase, 0, {}, {});
+  // Finalize block with reward 0.
+  finalize(state, rev, block.coinbase, 0, {}, {});
 
-    // Save the test.
-    auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, res, state);
-    std::ostringstream output_stream;
-    output_stream << std::setw(2) << j;
-    return output_stream.str();
-  } catch (...) {
-    return std::nullopt;
-  }
+  // Save the test.
+  auto j = to_state_test("", c.block, tx, test->pre_state, c.rev, res, state);
+  std::ostringstream output_stream;
+  output_stream << std::setw(2) << j;
+  return output_stream.str();
 }
 
 void export_corpus(std::string_view extension, const fs::path& corpus_dir,
@@ -114,8 +110,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   const auto test = export_test(input_stream);
   if (!test) {
-    std::cerr << "Failed to export test\n";
-    return -1;
+    return -1;  // truncated input file
   }
 
   GoSlice go_test{const_cast<char*>(test->data()),

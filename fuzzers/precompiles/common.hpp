@@ -3,5 +3,6 @@
 
 namespace fzz {
 using namespace evmone::test;
-std::optional<StateTransitionTest> load_state_test(std::istream& input);
+std::optional<StateTransitionTest>
+load_state_test(std::istream& input) noexcept;
 } // namespace fzz
