@@ -23,8 +23,12 @@ size_t mutate_bls12_g1add(std::minstd_rand& rand, uint8_t* data, size_t size,
     LLVMFuzzerMutate(data + size, EXPECTED_SIZE - size, EXPECTED_SIZE - size);
     return EXPECTED_SIZE;
   }
-  if (size > EXPECTED_SIZE)
-    return EXPECTED_SIZE;
+
+  if (size > EXPECTED_SIZE) {
+    // FIXME: This early return doesn't work for mutation.
+    // return EXPECTED_SIZE;
+    size = EXPECTED_SIZE;
+  }
 
   if (std::count(data, data + 16, 0) != 16) {
     std::memset(data, 0, 16);
@@ -68,7 +72,7 @@ size_t mutate_bls12_g1add(std::minstd_rand& rand, uint8_t* data, size_t size,
 size_t mutate_precompile_input(std::minstd_rand& rand, PrecompileId id,
                                uint8_t* data, size_t size, size_t max_size) {
 
-  if (rand() % 100 == 0) { // with 99% probability, mutate specific precompiles
+  if (rand() % 100 != 0) { // with 99% probability, mutate specific precompiles
     switch (id) {
     case PrecompileId::bls12_g1add:
       return mutate_bls12_g1add(rand, data, size, max_size);
