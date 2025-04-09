@@ -58,9 +58,21 @@ size_t mutate_bls12_g1add(std::minstd_rand& rand, uint8_t* data, size_t size,
 
   const auto s = rand() % 2 == 0 ? &p : &q;
 
-  blst_p1 r;
-  blst_p1_add_or_double_affine(&r, blst_p1_generator(), s);
-  blst_p1_to_affine(s, &r);
+  if (rand() % 2 == 0) {
+    // +1
+    blst_p1 r;
+    blst_p1_add_or_double_affine(&r, blst_p1_generator(), s);
+    blst_p1_to_affine(s, &r);
+  } else {
+    // mess up the x0
+    LLVMFuzzerMutate(data + 16, 48, 48);
+    data[16] |= 0x80; // add the expected compression bit
+
+    // use uncompress function to create a point from random x coordinate
+    // this reports errors like "not on curve" but ignore these
+    // it looks it modifies the output point despite errors
+    blst_p1_uncompress(s, data + 16);
+  }
 
   const auto out = data + (rand() % 2 == 0 ? 0 : BLS12_G1_POINT_SIZE);
   blst_bendian_from_fp(out + 16, &s->x);
