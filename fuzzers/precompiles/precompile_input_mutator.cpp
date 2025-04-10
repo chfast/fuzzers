@@ -1,4 +1,5 @@
 #include "precompile_input_mutator.hpp"
+#include "evmone_precompiles/sha256.hpp"
 
 #include <blst.h>
 #include <cassert>
@@ -111,6 +112,18 @@ size_t mutate_bls12_g1add(std::minstd_rand& rand, uint8_t* data, size_t size,
   blst_bendian_from_fp(out + 16 + 64, &s->y);
   return size;
 }
+
+size_t mutate_kzg(std::minstd_rand& rand, uint8_t* data, size_t size,
+                  size_t max_size) {
+  assert(size == 192);
+
+  // the first element of the input must be the SHA256 of the commitment (4th
+  // element, 48 bytes).
+  evmone::crypto::sha256(reinterpret_cast<std::byte*>(data),
+                         reinterpret_cast<const std::byte*>(data + 96), 48);
+  data[0] = 0x01; // the hash version
+  return size;
+}
 } // namespace
 
 size_t mutate_precompile_input(std::minstd_rand& rand, PrecompileId id,
@@ -135,7 +148,7 @@ size_t mutate_precompile_input(std::minstd_rand& rand, PrecompileId id,
       break;
     case PrecompileId::point_evaluation:
       size = fixup_input_size(192, data, size, max_size);
-      break;
+      return mutate_kzg(rand, data, size, max_size);
     case PrecompileId::bls12_g1add:
       return mutate_bls12_g1add(rand, data, size, max_size);
     case PrecompileId::bls12_g1msm:
