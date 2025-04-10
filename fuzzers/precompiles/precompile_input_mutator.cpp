@@ -24,6 +24,24 @@ size_t fixup_input_size(size_t element_size, uint8_t* data, size_t size,
   return element_size;
 }
 
+size_t fixup_input_array_size(size_t element_size, uint8_t* data, size_t size,
+                              size_t max_size) {
+  const auto n = size / element_size;
+  const auto m = size % element_size;
+  if (m == 0)
+    return size;
+
+  // try to extend the input by a full element
+  const auto new_size = (n + 1) * element_size;
+  if (new_size > max_size)          // no capacity for extra element
+    return new_size - element_size; // trim it at the element boundary
+
+  // mutate the extended data
+  // TODO: Use masked mutation.
+  LLVMFuzzerMutate(data + size, new_size - size, new_size - size);
+  return new_size;
+}
+
 void fixup_input_padding(size_t element_size, size_t left_padding,
                          uint8_t* data, size_t size) {
   assert(size != 0);
@@ -109,8 +127,20 @@ size_t mutate_precompile_input(std::minstd_rand& rand, PrecompileId id,
       break;
     case PrecompileId::bls12_g1add:
       return mutate_bls12_g1add(rand, data, size, max_size);
+    case PrecompileId::bls12_g1msm:
+      size = fixup_input_array_size(128 + 32, data, size, max_size);
+      // TODO: fixup padding
+      break;
     case PrecompileId::bls12_g2add:
       size = fixup_input_size(512, data, size, max_size);
+      break;
+    case PrecompileId::bls12_g2msm:
+      size = fixup_input_array_size(256 + 32, data, size, max_size);
+      // TODO: fixup padding
+      break;
+    case PrecompileId::bls12_pairing_check:
+      size = fixup_input_array_size(128 + 256, data, size, max_size);
+      fixup_input_padding(64, 16, data, size);
       break;
     case PrecompileId::bls12_map_fp_to_g1:
       size = fixup_input_size(64, data, size, max_size);
