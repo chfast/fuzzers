@@ -92,8 +92,34 @@ size_t mutate_precompile_input(std::minstd_rand& rand, PrecompileId id,
 
   if (rand() % 100 != 0) { // with 99% probability, mutate specific precompiles
     switch (id) {
+    case PrecompileId::ecrecover:
+      size = fixup_input_size(128, data, size, max_size);
+      break;
+    case PrecompileId::ecadd:
+      size = fixup_input_size(128, data, size, max_size);
+      break;
+    case PrecompileId::ecmul:
+      size = fixup_input_size(96, data, size, max_size);
+      break;
+    case PrecompileId::blake2bf:
+      size = fixup_input_size(213, data, size, max_size);
+      break;
+    case PrecompileId::point_evaluation:
+      size = fixup_input_size(192, data, size, max_size);
+      break;
     case PrecompileId::bls12_g1add:
       return mutate_bls12_g1add(rand, data, size, max_size);
+    case PrecompileId::bls12_g2add:
+      size = fixup_input_size(512, data, size, max_size);
+      break;
+    case PrecompileId::bls12_map_fp_to_g1:
+      size = fixup_input_size(64, data, size, max_size);
+      fixup_input_padding(64, 16, data, size);
+      break;
+    case PrecompileId::bls12_map_fp2_to_g2:
+      size = fixup_input_size(128, data, size, max_size);
+      fixup_input_padding(64, 16, data, size);
+      break;
     default:
     }
   }
