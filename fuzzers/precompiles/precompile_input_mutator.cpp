@@ -10,6 +10,8 @@
 extern "C" size_t LLVMFuzzerMutate(uint8_t* data, size_t size, size_t max_size);
 
 namespace {
+constexpr auto BLS12_FIELD_ELEMENT_SIZE = 64;
+constexpr auto BLS12_G1_POINT_SIZE = 2 * BLS12_FIELD_ELEMENT_SIZE;
 
 size_t fixup_input_size(size_t element_size, uint8_t* data, size_t size,
                         size_t max_size) {
@@ -51,8 +53,17 @@ void fixup_input_padding(size_t element_size, size_t left_padding,
   }
 }
 
-constexpr auto BLS12_FIELD_ELEMENT_SIZE = 64;
-constexpr auto BLS12_G1_POINT_SIZE = 2 * BLS12_FIELD_ELEMENT_SIZE;
+void fixup_msm_input_padding(size_t point_size, uint8_t* data, size_t size) {
+  assert(size != 0);
+  const auto num_elems = point_size / BLS12_FIELD_ELEMENT_SIZE;
+  const auto pair_size = point_size + 32;
+  assert(size % pair_size == 0);
+  for (auto p = data; p != data + size; p += pair_size) {
+    for (size_t i = 0; i < num_elems; ++i) {
+      std::memset(p + i * BLS12_FIELD_ELEMENT_SIZE, 0, 16);
+    }
+  }
+}
 
 size_t mutate_bls12_g1add(std::minstd_rand& rand, uint8_t* data, size_t size,
                           size_t max_size) {
@@ -129,14 +140,14 @@ size_t mutate_precompile_input(std::minstd_rand& rand, PrecompileId id,
       return mutate_bls12_g1add(rand, data, size, max_size);
     case PrecompileId::bls12_g1msm:
       size = fixup_input_array_size(128 + 32, data, size, max_size);
-      // TODO: fixup padding
+      fixup_msm_input_padding(128, data, size);
       break;
     case PrecompileId::bls12_g2add:
       size = fixup_input_size(512, data, size, max_size);
       break;
     case PrecompileId::bls12_g2msm:
       size = fixup_input_array_size(256 + 32, data, size, max_size);
-      // TODO: fixup padding
+      fixup_msm_input_padding(256, data, size);
       break;
     case PrecompileId::bls12_pairing_check:
       size = fixup_input_array_size(128 + 256, data, size, max_size);
