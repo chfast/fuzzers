@@ -1,6 +1,7 @@
 #include "precompile_input_mutator.hpp"
 
 #include <blst.h>
+#include <cassert>
 
 // Experimental, may go away in the future.
 // libFuzzer-provided function to be used inside LLVMFuzzerCustomMutator.
@@ -10,42 +11,44 @@ extern "C" size_t LLVMFuzzerMutate(uint8_t* data, size_t size, size_t max_size);
 
 namespace {
 
+size_t fixup_input_size(size_t element_size, uint8_t* data, size_t size,
+                        size_t max_size) {
+  if (max_size < element_size)
+    return 0;
+  if (size < element_size) {
+    // TODO: Use masked mutation.
+    LLVMFuzzerMutate(data + size, element_size - size, element_size - size);
+    return element_size;
+  }
+  assert(size >= element_size);
+  return element_size;
+}
+
+void fixup_input_padding(size_t element_size, size_t left_padding,
+                         uint8_t* data, size_t size) {
+  assert(size != 0);
+  assert(size % element_size == 0);
+  for (auto p = data; p != data + size; p += element_size) {
+    std::memset(p, 0, left_padding);
+  }
+}
+
 constexpr auto BLS12_FIELD_ELEMENT_SIZE = 64;
 constexpr auto BLS12_G1_POINT_SIZE = 2 * BLS12_FIELD_ELEMENT_SIZE;
 
 size_t mutate_bls12_g1add(std::minstd_rand& rand, uint8_t* data, size_t size,
                           size_t max_size) {
-  static constexpr auto EXPECTED_SIZE = BLS12_G1_POINT_SIZE * 2;
-  if (max_size < EXPECTED_SIZE)
+  size = fixup_input_size(BLS12_G1_POINT_SIZE * 2, data, size, max_size);
+  if (size == 0) [[unlikely]]
     return 0;
-  if (size < EXPECTED_SIZE) {
-    // TODO: Use masked mutation.
-    LLVMFuzzerMutate(data + size, EXPECTED_SIZE - size, EXPECTED_SIZE - size);
-    return EXPECTED_SIZE;
-  }
+  assert(size == BLS12_G1_POINT_SIZE * 2);
+  assert(size <= max_size);
 
-  if (size > EXPECTED_SIZE) {
-    // FIXME: This early return doesn't work for mutation.
-    // return EXPECTED_SIZE;
-    size = EXPECTED_SIZE;
-  }
-
-  if (std::count(data, data + 16, 0) != 16) {
-    std::memset(data, 0, 16);
-    return EXPECTED_SIZE;
-  }
-  if (std::count(data + 64, data + 64 + 16, 0) != 16) {
-    std::memset(data + 64, 0, 16);
-    return EXPECTED_SIZE;
-  }
-  if (std::count(data + 128, data + 128 + 16, 0) != 16) {
-    std::memset(data + 128, 0, 16);
-    return EXPECTED_SIZE;
-  }
-  if (std::count(data + 192, data + 192 + 16, 0) != 16) {
-    std::memset(data + 192, 0, 16);
-    return EXPECTED_SIZE;
-  }
+  fixup_input_padding(BLS12_FIELD_ELEMENT_SIZE, 16, data, size);
+  assert(std::count(data, data + 16, 0) == 16);
+  assert(std::count(data + 64, data + 64 + 16, 0) == 16);
+  assert(std::count(data + 128, data + 128 + 16, 0) == 16);
+  assert(std::count(data + 192, data + 192 + 16, 0) == 16);
 
   blst_fp x0, y0, x1, y1;
   blst_fp_from_bendian(&x0, data + 16);
@@ -77,12 +80,15 @@ size_t mutate_bls12_g1add(std::minstd_rand& rand, uint8_t* data, size_t size,
   const auto out = data + (rand() % 2 == 0 ? 0 : BLS12_G1_POINT_SIZE);
   blst_bendian_from_fp(out + 16, &s->x);
   blst_bendian_from_fp(out + 16 + 64, &s->y);
-  return EXPECTED_SIZE;
+  return size;
 }
 } // namespace
 
 size_t mutate_precompile_input(std::minstd_rand& rand, PrecompileId id,
                                uint8_t* data, size_t size, size_t max_size) {
+
+  assert(size == max_size);
+  assert(size != 0);
 
   if (rand() % 100 != 0) { // with 99% probability, mutate specific precompiles
     switch (id) {
